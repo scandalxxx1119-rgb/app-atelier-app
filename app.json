@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "App Atelier",
+    "slug": "app-atelier-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "appatelier",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.appatelier.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.appatelier.app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        { "photosPermission": "アプリのアイコンや画像を選択するためにフォトライブラリへのアクセスが必要です。" }
+      ]
+    ]
+  }
+}
