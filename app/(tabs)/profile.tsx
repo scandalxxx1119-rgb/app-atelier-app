@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, useColorScheme, Image, Alert, ActivityIndicator,
+  StyleSheet, Image, Alert, ActivityIndicator,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
+import { useTheme } from "@/lib/theme";
 import Badge, { BadgeType } from "@/components/Badge";
 import type { User } from "@supabase/supabase-js";
 
@@ -19,7 +20,7 @@ type App = {
 };
 
 export default function ProfileScreen() {
-  const isDark = useColorScheme() === "dark";
+  const { isDark } = useTheme();
   const s = styles(isDark);
   const router = useRouter();
 
@@ -34,6 +35,9 @@ export default function ProfileScreen() {
   const [usernameUpdatedAt, setUsernameUpdatedAt] = useState<string | null>(null);
   const [apps, setApps] = useState<App[]>([]);
   const [points, setPoints] = useState(0);
+  const [screenshotExtended, setScreenshotExtended] = useState(false);
+  const [activeBoosts, setActiveBoosts] = useState<{ app_id: string; type: string; expires_at: string }[]>([]);
+  const [memberCount, setMemberCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -55,7 +59,7 @@ export default function ProfileScreen() {
 
     const [profileRes, appsRes, pointsRes] = await Promise.all([
       supabase.from("aa_profiles")
-        .select("username, badge, username_updated_at, bio, twitter_url, github_url, website_url, avatar_url")
+        .select("username, badge, username_updated_at, bio, twitter_url, github_url, website_url, avatar_url, screenshot_extended")
         .eq("id", auth.user.id).single(),
       supabase.from("aa_apps")
         .select("id, name, tagline, icon_url, likes_count, status")
@@ -71,9 +75,26 @@ export default function ProfileScreen() {
     setTwitterUrl(profileRes.data?.twitter_url ?? "");
     setGithubUrl(profileRes.data?.github_url ?? "");
     setWebsiteUrl(profileRes.data?.website_url ?? "");
-    setApps((appsRes.data as App[]) ?? []);
+    const appsData = (appsRes.data as App[]) ?? [];
+    setApps(appsData);
+    setScreenshotExtended(profileRes.data?.screenshot_extended ?? false);
     const total = (pointsRes.data ?? []).reduce((sum: number, r: { amount: number }) => sum + r.amount, 0);
     setPoints(total);
+
+    if (appsData.length > 0) {
+      const now = new Date().toISOString();
+      const { data: boosts } = await supabase.from("aa_boosts")
+        .select("app_id, type, expires_at")
+        .in("app_id", appsData.map((a) => a.id))
+        .gt("expires_at", now);
+      setActiveBoosts(boosts ?? []);
+    }
+
+    if (profileRes.data?.badge === "master") {
+      const { count } = await supabase.from("aa_profiles").select("*", { count: "exact", head: true });
+      setMemberCount(count ?? 0);
+    }
+
     setLoading(false);
   }, []);
 
@@ -135,6 +156,56 @@ export default function ProfileScreen() {
     router.replace("/auth");
   };
 
+  const handleBuyScreenshot = async () => {
+    if (!user) return;
+    if (points < 10) { Alert.alert("ポイント不足", "スクリーンショット拡張には10ptが必要です"); return; }
+    Alert.alert("確認", "スクリーンショット拡張を購入しますか？（10pt）", [
+      { text: "キャンセル", style: "cancel" },
+      {
+        text: "購入する",
+        onPress: async () => {
+          await supabase.from("aa_profiles").update({ screenshot_extended: true }).eq("id", user.id);
+          await supabase.from("aa_points").insert({ user_id: user.id, amount: -10, reason: "スクリーンショット拡張購入" });
+          setScreenshotExtended(true);
+          setPoints((p) => p - 10);
+        },
+      },
+    ]);
+  };
+
+  const handleBoost = async (appId: string, type: "gold" | "pickup") => {
+    if (!user) return;
+    const cost = type === "gold" ? 25 : 50;
+    const days = type === "gold" ? 3 : 2;
+    const label = type === "gold" ? "ゴールドブースト" : "ピックアップ";
+    if (points < cost) { Alert.alert("ポイント不足", `${label}には${cost}ptが必要です`); return; }
+    const appName = apps.find((a) => a.id === appId)?.name ?? "";
+    Alert.alert("確認", `「${appName}」を${label}（${days}日間）しますか？\n${cost}pt消費します`, [
+      { text: "キャンセル", style: "cancel" },
+      {
+        text: "購入する",
+        onPress: async () => {
+          const expires = new Date();
+          expires.setDate(expires.getDate() + days);
+          await supabase.from("aa_boosts").insert({
+            app_id: appId, user_id: user.id, type, expires_at: expires.toISOString(),
+          });
+          await supabase.from("aa_points").insert({
+            user_id: user.id, amount: -cost, reason: `${label}（${appName}）`, app_id: appId,
+          });
+          setPoints((p) => p - cost);
+          setActiveBoosts((prev) => [...prev, { app_id: appId, type, expires_at: expires.toISOString() }]);
+        },
+      },
+    ]);
+  };
+
+  const boostExpiry = (expiresAt: string) => {
+    const diff = new Date(expiresAt).getTime() - Date.now();
+    const hours = Math.ceil(diff / (1000 * 60 * 60));
+    return hours > 24 ? `残${Math.ceil(hours / 24)}日` : `残${hours}h`;
+  };
+
   if (loading) return <View style={s.container}><ActivityIndicator style={{ marginTop: 60 }} /></View>;
 
   return (
@@ -160,6 +231,11 @@ export default function ProfileScreen() {
           <View style={s.pointsBadge}>
             <Text style={s.pointsText}>🪙 {points} pt</Text>
           </View>
+          {memberCount !== null && (
+            <View style={[s.pointsBadge, { marginTop: 4, backgroundColor: isDark ? "#2e1065" : "#ede9fe" }]}>
+              <Text style={[s.pointsText, { color: isDark ? "#c4b5fd" : "#7c3aed" }]}>👥 {memberCount} 人</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -247,6 +323,66 @@ export default function ProfileScreen() {
         ))}
       </View>
 
+      {/* Point Shop */}
+      <View style={s.section}>
+        <Text style={s.sectionTitle}>ポイントショップ</Text>
+
+        {/* Screenshot extension */}
+        <View style={s.shopRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.shopItemTitle}>📸 スクリーンショット拡張</Text>
+            <Text style={s.shopItemDesc}>最大10枚まで（永続・1回限り）</Text>
+          </View>
+          {screenshotExtended ? (
+            <View style={s.purchasedBadge}><Text style={s.purchasedText}>購入済み</Text></View>
+          ) : (
+            <TouchableOpacity style={s.buyBtn} onPress={handleBuyScreenshot}>
+              <Text style={s.buyBtnText}>10pt</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* App boosts */}
+        {apps.length > 0 && (
+          <View style={{ marginTop: 16 }}>
+            <Text style={s.shopSubTitle}>アプリブースト</Text>
+            {apps.map((app) => {
+              const goldBoost = activeBoosts.find((b) => b.app_id === app.id && b.type === "gold");
+              const pickupBoost = activeBoosts.find((b) => b.app_id === app.id && b.type === "pickup");
+              return (
+                <View key={app.id} style={s.boostCard}>
+                  <Text style={s.boostAppName} numberOfLines={1}>{app.name}</Text>
+                  <View style={{ gap: 8, marginTop: 8 }}>
+                    {goldBoost ? (
+                      <View style={[s.activeBadge, { backgroundColor: isDark ? "#451a03" : "#fef3c7" }]}>
+                        <Text style={{ fontSize: 12, color: isDark ? "#fcd34d" : "#d97706", fontWeight: "600" }}>
+                          ⭐ ゴールドブースト中 {boostExpiry(goldBoost.expires_at)}
+                        </Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity style={s.boostBtn} onPress={() => handleBoost(app.id, "gold")}>
+                        <Text style={s.boostBtnText}>⭐ ゴールドブースト  25pt（3日間）</Text>
+                      </TouchableOpacity>
+                    )}
+                    {pickupBoost ? (
+                      <View style={[s.activeBadge, { backgroundColor: isDark ? "#2e1065" : "#ede9fe" }]}>
+                        <Text style={{ fontSize: 12, color: isDark ? "#c4b5fd" : "#7c3aed", fontWeight: "600" }}>
+                          🔥 ピックアップ中 {boostExpiry(pickupBoost.expires_at)}
+                        </Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity style={[s.boostBtn, s.pickupBtn]} onPress={() => handleBoost(app.id, "pickup")}>
+                        <Text style={[s.boostBtnText, { color: isDark ? "#c4b5fd" : "#7c3aed" }]}>🔥 ピックアップ  50pt（2日間）</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </View>
+
       {/* Sign out */}
       <TouchableOpacity style={s.signOutBtn} onPress={handleSignOut}>
         <Text style={s.signOutBtnText}>ログアウト</Text>
@@ -291,4 +427,18 @@ const styles = (isDark: boolean) => StyleSheet.create({
   deleteBtnText: { fontSize: 13, color: "#ef4444" },
   signOutBtn: { borderRadius: 10, paddingVertical: 14, alignItems: "center", borderWidth: 1, borderColor: isDark ? "#3f3f46" : "#e4e4e7" },
   signOutBtnText: { fontSize: 15, color: isDark ? "#71717a" : "#a1a1aa" },
+  shopRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: isDark ? "#27272a" : "#f4f4f5" },
+  shopItemTitle: { fontSize: 14, fontWeight: "600", color: isDark ? "#ffffff" : "#09090b" },
+  shopItemDesc: { fontSize: 12, color: isDark ? "#71717a" : "#a1a1aa", marginTop: 2 },
+  purchasedBadge: { backgroundColor: isDark ? "#14532d" : "#dcfce7", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  purchasedText: { fontSize: 12, fontWeight: "600", color: isDark ? "#86efac" : "#16a34a" },
+  buyBtn: { backgroundColor: isDark ? "#ffffff" : "#09090b", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
+  buyBtnText: { fontSize: 13, fontWeight: "700", color: isDark ? "#09090b" : "#ffffff" },
+  shopSubTitle: { fontSize: 12, fontWeight: "700", color: isDark ? "#71717a" : "#a1a1aa", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 },
+  boostCard: { backgroundColor: isDark ? "#09090b" : "#f4f4f5", borderRadius: 10, padding: 12, marginBottom: 10 },
+  boostAppName: { fontSize: 13, fontWeight: "600", color: isDark ? "#ffffff" : "#09090b" },
+  boostBtn: { backgroundColor: isDark ? "#27272a" : "#ffffff", borderWidth: 1, borderColor: isDark ? "#3f3f46" : "#e4e4e7", borderRadius: 8, paddingVertical: 10, paddingHorizontal: 14 },
+  pickupBtn: { borderColor: isDark ? "#7c3aed" : "#c4b5fd" },
+  boostBtnText: { fontSize: 13, fontWeight: "600", color: isDark ? "#fcd34d" : "#d97706" },
+  activeBadge: { borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12 },
 });
