@@ -1,13 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import {
-  View, Text, FlatList, TextInput, TouchableOpacity,
-  StyleSheet, useColorScheme, RefreshControl, ScrollView, Image,
+  View, Text, FlatList, TouchableOpacity,
+  StyleSheet, RefreshControl, Image, ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
-import { PLATFORM_TAGS, CATEGORY_TAGS, SPECIAL_TAGS } from "@/lib/tags";
-import Badge, { isPremiumBadge, BadgeType } from "@/components/Badge";
-import type { User } from "@supabase/supabase-js";
+import { useTheme } from "@/lib/theme";
 
 type App = {
   id: string;
@@ -18,274 +16,235 @@ type App = {
   likes_count: number;
   status: string | null;
   user_id: string;
-  aa_profiles?: { username: string; badge: string | null } | null;
+  username?: string;
 };
 
-const SORT_OPTIONS = [
-  { label: "新着", value: "created_at" },
-  { label: "人気", value: "likes_count" },
-];
+type FeaturedApp = App & { username: string };
 
 export default function HomeScreen() {
-  const isDark = useColorScheme() === "dark";
+  const { isDark } = useTheme();
   const s = styles(isDark);
   const router = useRouter();
 
-  const [apps, setApps] = useState<App[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [featured, setFeatured] = useState<FeaturedApp[]>([]);
+  const [newApps, setNewApps] = useState<App[]>([]);
+  const [popularApps, setPopularApps] = useState<App[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [search, setSearch] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [sort, setSort] = useState("created_at");
-  const [tab, setTab] = useState<"all" | "mine">("all");
-  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
-    const { data: listener } = supabase.auth.onAuthStateChange((_e, session) =>
-      setUser(session?.user ?? null)
-    );
-    return () => listener.subscription.unsubscribe();
-  }, []);
+  const fetchAll = useCallback(async () => {
+    const now = new Date().toISOString();
 
-  const fetchApps = useCallback(async () => {
-    let query = supabase.from("aa_apps").select("*").order(sort, { ascending: false });
-    if (tab === "mine" && user) query = query.eq("user_id", user.id);
+    // Fetch active boosts for featured section
+    const { data: boosts } = await supabase
+      .from("aa_boosts")
+      .select("app_id")
+      .gt("expires_at", now)
+      .order("created_at", { ascending: false });
 
-    const { data } = await query;
-    let appsData = (data as App[]) ?? [];
+    const boostedAppIds = [...new Set((boosts ?? []).map((b: { app_id: string }) => b.app_id))];
 
-    const userIds = [...new Set(appsData.map((a) => a.user_id))];
-    if (userIds.length > 0) {
-      const { data: profiles } = await supabase
-        .from("aa_profiles").select("id, username, badge").in("id", userIds);
-      const map: Record<string, { username: string; badge: string | null }> = {};
-      profiles?.forEach((p: { id: string; username: string; badge: string | null }) => {
-        map[p.id] = { username: p.username, badge: p.badge };
+    let featuredApps: FeaturedApp[] = [];
+    if (boostedAppIds.length > 0) {
+      const { data: fApps } = await supabase
+        .from("aa_apps")
+        .select("id, name, tagline, icon_url, tags, likes_count, status, user_id")
+        .in("id", boostedAppIds)
+        .limit(20);
+
+      if (fApps && fApps.length > 0) {
+        const userIds = [...new Set(fApps.map((a: App) => a.user_id))];
+        const { data: profiles } = await supabase
+          .from("aa_profiles").select("id, username").in("id", userIds);
+        const profileMap: Record<string, string> = {};
+        profiles?.forEach((p: { id: string; username: string }) => {
+          profileMap[p.id] = p.username;
+        });
+        featuredApps = fApps.map((a: App) => ({ ...a, username: profileMap[a.user_id] ?? "anonymous" }));
+      }
+    }
+    setFeatured(featuredApps);
+
+    // Fetch new apps + popular apps in parallel
+    const [newRes, popularRes] = await Promise.all([
+      supabase.from("aa_apps")
+        .select("id, name, tagline, icon_url, tags, likes_count, status, user_id")
+        .order("created_at", { ascending: false })
+        .limit(20),
+      supabase.from("aa_apps")
+        .select("id, name, tagline, icon_url, tags, likes_count, status, user_id")
+        .order("likes_count", { ascending: false })
+        .limit(10),
+    ]);
+
+    const allApps = [...(newRes.data ?? []), ...(popularRes.data ?? [])];
+    const allUserIds = [...new Set(allApps.map((a: App) => a.user_id))];
+    let profileMap2: Record<string, string> = {};
+    if (allUserIds.length > 0) {
+      const { data: profiles2 } = await supabase
+        .from("aa_profiles").select("id, username").in("id", allUserIds);
+      profiles2?.forEach((p: { id: string; username: string }) => {
+        profileMap2[p.id] = p.username;
       });
-      appsData = appsData.map((a) => ({ ...a, aa_profiles: map[a.user_id] ?? null }));
     }
 
-    let filtered = appsData;
-    if (search) {
-      const q = search.toLowerCase();
-      filtered = filtered.filter(
-        (a) => a.name.toLowerCase().includes(q) || a.tagline.toLowerCase().includes(q)
-      );
-    }
-    if (selectedTags.length > 0) {
-      filtered = filtered.filter((a) => selectedTags.every((t) => a.tags?.includes(t)));
-    }
-    if (tab === "all") {
-      filtered.sort((a, b) =>
-        (isPremiumBadge(b.aa_profiles?.badge as BadgeType) ? 1 : 0) -
-        (isPremiumBadge(a.aa_profiles?.badge as BadgeType) ? 1 : 0)
-      );
-    }
-    setApps(filtered);
-  }, [sort, search, selectedTags, tab, user]);
+    setNewApps((newRes.data ?? []).map((a: App) => ({ ...a, username: profileMap2[a.user_id] ?? "anonymous" })));
+    setPopularApps((popularRes.data ?? []).map((a: App) => ({ ...a, username: profileMap2[a.user_id] ?? "anonymous" })));
+  }, []);
 
   useEffect(() => {
     setLoading(true);
-    fetchApps().finally(() => setLoading(false));
-  }, [fetchApps]);
+    fetchAll().finally(() => setLoading(false));
+  }, [fetchAll]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchApps();
+    await fetchAll();
     setRefreshing(false);
   };
 
-  const toggleTag = (tag: string) =>
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
-
-  const statusBadge = (status: string | null) => {
-    if (!status || status === "released")
-      return <View style={[s.statusBadge, { backgroundColor: isDark ? "#14532d" : "#dcfce7" }]}><Text style={[s.statusText, { color: isDark ? "#86efac" : "#16a34a" }]}>✓ リリース済み</Text></View>;
-    if (status === "beta")
-      return <View style={[s.statusBadge, { backgroundColor: isDark ? "#1e3a5f" : "#dbeafe" }]}><Text style={[s.statusText, { color: isDark ? "#93c5fd" : "#2563eb" }]}>β ベータ版</Text></View>;
-    return <View style={[s.statusBadge, { backgroundColor: isDark ? "#451a03" : "#fef3c7" }]}><Text style={[s.statusText, { color: isDark ? "#fcd34d" : "#d97706" }]}>🚧 開発中</Text></View>;
-  };
-
-  const renderApp = ({ item }: { item: App }) => (
-    <TouchableOpacity style={s.card} onPress={() => router.push(`/apps/${item.id}`)}>
-      <View style={s.cardHeader}>
-        {item.icon_url ? (
-          <Image source={{ uri: item.icon_url }} style={s.icon} />
-        ) : (
-          <View style={s.iconPlaceholder}>
-            <Text style={s.iconText}>{item.name[0]}</Text>
-          </View>
-        )}
-        <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={s.appName} numberOfLines={1}>{item.name}</Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
-            <Text style={s.username} numberOfLines={1}>
-              {item.aa_profiles?.username ?? "anonymous"}
-            </Text>
-            {item.aa_profiles?.badge && (
-              <Badge badge={item.aa_profiles.badge as BadgeType} size="xs" />
-            )}
-          </View>
-        </View>
-        <View style={{ alignItems: "center" }}>
-          <Text style={s.heartIcon}>♥</Text>
-          <Text style={s.likesCount}>{item.likes_count}</Text>
-        </View>
+  const AppIcon = ({ item, size = 60 }: { item: App; size?: number }) => (
+    item.icon_url ? (
+      <Image source={{ uri: item.icon_url }} style={{ width: size, height: size, borderRadius: size * 0.22 }} />
+    ) : (
+      <View style={[s.iconPlaceholder, { width: size, height: size, borderRadius: size * 0.22 }]}>
+        <Text style={{ fontSize: size * 0.4, fontWeight: "700", color: isDark ? "#71717a" : "#a1a1aa" }}>
+          {item.name[0]}
+        </Text>
       </View>
-      <Text style={s.tagline} numberOfLines={2}>{item.tagline}</Text>
-      <View style={s.tagsRow}>
-        {statusBadge(item.status)}
-        {item.tags?.slice(0, 2).map((tag) => (
-          <View key={tag} style={s.tag}>
-            <Text style={s.tagText}>{tag}</Text>
-          </View>
-        ))}
-        {item.tags && item.tags.length > 2 && (
-          <View style={s.tag}><Text style={s.tagText}>+{item.tags.length - 2}</Text></View>
-        )}
+    )
+  );
+
+  const renderFeaturedCard = (item: FeaturedApp) => (
+    <TouchableOpacity key={item.id} style={s.featuredCard} onPress={() => router.push(`/apps/${item.id}`)}>
+      <AppIcon item={item} size={80} />
+      <Text style={s.featuredName} numberOfLines={1}>{item.name}</Text>
+      <Text style={s.featuredUser} numberOfLines={1}>{item.username}</Text>
+      <TouchableOpacity style={s.getBtn}>
+        <Text style={s.getBtnText}>見る</Text>
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+
+  const renderRow = ({ item }: { item: App }) => (
+    <TouchableOpacity style={s.rowCard} onPress={() => router.push(`/apps/${item.id}`)}>
+      <AppIcon item={item} size={56} />
+      <View style={{ flex: 1, marginLeft: 12 }}>
+        <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
+        <Text style={s.rowTagline} numberOfLines={1}>{item.tagline}</Text>
+        <Text style={s.rowUser} numberOfLines={1}>{(item as App & { username?: string }).username}</Text>
+      </View>
+      <View style={{ alignItems: "center", gap: 4 }}>
+        <TouchableOpacity style={s.getBtn} onPress={() => router.push(`/apps/${item.id}`)}>
+          <Text style={s.getBtnText}>見る</Text>
+        </TouchableOpacity>
+        <Text style={s.likeCount}>♥ {item.likes_count}</Text>
       </View>
     </TouchableOpacity>
   );
 
-  return (
-    <View style={s.container}>
-      {/* Search */}
-      <View style={s.searchRow}>
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="アプリを検索..."
-          placeholderTextColor={isDark ? "#52525b" : "#a1a1aa"}
-          style={s.searchInput}
-        />
+  const SectionHeader = ({ title, subtitle }: { title: string; subtitle?: string }) => (
+    <View style={s.sectionHeader}>
+      <View>
+        <Text style={s.sectionTitle}>{title}</Text>
+        {subtitle && <Text style={s.sectionSubtitle}>{subtitle}</Text>}
       </View>
-
-      {/* Sort */}
-      <View style={s.sortRow}>
-        {SORT_OPTIONS.map((opt) => (
-          <TouchableOpacity
-            key={opt.value}
-            onPress={() => setSort(opt.value)}
-            style={[s.sortBtn, sort === opt.value && s.sortBtnActive]}
-          >
-            <Text style={[s.sortBtnText, sort === opt.value && s.sortBtnTextActive]}>
-              {opt.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-        <View style={{ flex: 1 }} />
-        {user && (
-          <>
-            <TouchableOpacity onPress={() => setTab("all")} style={[s.sortBtn, tab === "all" && s.sortBtnActive]}>
-              <Text style={[s.sortBtnText, tab === "all" && s.sortBtnTextActive]}>すべて</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setTab("mine")} style={[s.sortBtn, tab === "mine" && s.sortBtnActive]}>
-              <Text style={[s.sortBtnText, tab === "mine" && s.sortBtnTextActive]}>マイアプリ</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-
-      {/* Tag filters */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tagScroll} contentContainerStyle={{ gap: 6, paddingHorizontal: 16 }}>
-        {[...SPECIAL_TAGS, ...PLATFORM_TAGS, ...CATEGORY_TAGS].map((tag) => (
-          <TouchableOpacity
-            key={tag}
-            onPress={() => toggleTag(tag)}
-            style={[s.filterTag, selectedTags.includes(tag) && s.filterTagActive]}
-          >
-            <Text style={[s.filterTagText, selectedTags.includes(tag) && s.filterTagTextActive]}>
-              {tag}
-            </Text>
-          </TouchableOpacity>
-        ))}
-        {selectedTags.length > 0 && (
-          <TouchableOpacity onPress={() => setSelectedTags([])} style={s.clearBtn}>
-            <Text style={s.clearBtnText}>クリア</Text>
-          </TouchableOpacity>
-        )}
-      </ScrollView>
-
-      <FlatList
-        data={apps}
-        keyExtractor={(item) => item.id}
-        renderItem={renderApp}
-        contentContainerStyle={{ padding: 16, gap: 12 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        ListEmptyComponent={
-          loading ? null : (
-            <View style={{ alignItems: "center", paddingTop: 60 }}>
-              <Text style={s.emptyText}>
-                {tab === "mine" ? "まだアプリを投稿していません" : "アプリが見つかりません"}
-              </Text>
-              <TouchableOpacity style={s.emptyBtn} onPress={() => router.push("/submit")}>
-                <Text style={s.emptyBtnText}>アプリを投稿する</Text>
-              </TouchableOpacity>
-            </View>
-          )
-        }
-      />
     </View>
+  );
+
+  const Divider = () => <View style={s.divider} />;
+
+  return (
+    <ScrollView
+      style={s.container}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      showsVerticalScrollIndicator={false}
+    >
+      {loading ? (
+        <View style={{ padding: 60, alignItems: "center" }}>
+          <Text style={s.loadingText}>読み込み中...</Text>
+        </View>
+      ) : (
+        <>
+          {/* Featured / Boosted */}
+          {featured.length > 0 && (
+            <View style={s.section}>
+              <SectionHeader title="注目アプリ" subtitle="ブースト中のアプリ" />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 16, paddingBottom: 4 }}>
+                {featured.map(renderFeaturedCard)}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* New Arrivals */}
+          {newApps.length > 0 && (
+            <View style={s.section}>
+              <SectionHeader title="新着アプリ" subtitle="最新の投稿" />
+              <View style={{ paddingHorizontal: 16 }}>
+                {newApps.slice(0, 5).map((item, index) => (
+                  <View key={item.id}>
+                    {renderRow({ item })}
+                    {index < Math.min(newApps.length, 5) - 1 && <Divider />}
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Popular Apps */}
+          {popularApps.length > 0 && (
+            <View style={[s.section, { marginBottom: 32 }]}>
+              <SectionHeader title="人気アプリ" subtitle="いいねが多い順" />
+              <View style={{ paddingHorizontal: 16 }}>
+                {popularApps.slice(0, 5).map((item, index) => (
+                  <View key={item.id}>
+                    {renderRow({ item })}
+                    {index < Math.min(popularApps.length, 5) - 1 && <Divider />}
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+        </>
+      )}
+    </ScrollView>
   );
 }
 
 const styles = (isDark: boolean) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: isDark ? "#09090b" : "#f4f4f5" },
-  searchRow: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
-  searchInput: {
+  container: { flex: 1, backgroundColor: isDark ? "#09090b" : "#f2f2f7" },
+  section: {
     backgroundColor: isDark ? "#18181b" : "#ffffff",
-    borderWidth: 1, borderColor: isDark ? "#3f3f46" : "#e4e4e7",
-    borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10,
-    fontSize: 14, color: isDark ? "#ffffff" : "#09090b",
-  },
-  sortRow: { flexDirection: "row", paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
-  sortBtn: {
-    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8,
-    borderWidth: 1, borderColor: isDark ? "#3f3f46" : "#e4e4e7",
-  },
-  sortBtnActive: { backgroundColor: isDark ? "#ffffff" : "#09090b", borderColor: "transparent" },
-  sortBtnText: { fontSize: 13, fontWeight: "500", color: isDark ? "#a1a1aa" : "#71717a" },
-  sortBtnTextActive: { color: isDark ? "#09090b" : "#ffffff" },
-  tagScroll: { maxHeight: 44, marginBottom: 4 },
-  filterTag: {
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99,
-    backgroundColor: isDark ? "#27272a" : "#f4f4f5", borderWidth: 1, borderColor: isDark ? "#3f3f46" : "#e4e4e7",
-  },
-  filterTagActive: { backgroundColor: isDark ? "#ffffff" : "#09090b", borderColor: "transparent" },
-  filterTagText: { fontSize: 12, color: isDark ? "#a1a1aa" : "#71717a", fontWeight: "500" },
-  filterTagTextActive: { color: isDark ? "#09090b" : "#ffffff" },
-  clearBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99, backgroundColor: "#ef4444" },
-  clearBtnText: { fontSize: 12, color: "#ffffff", fontWeight: "500" },
-  card: {
-    backgroundColor: isDark ? "#18181b" : "#ffffff",
-    borderRadius: 14, padding: 16,
+    marginHorizontal: 16, marginTop: 20,
+    borderRadius: 16, overflow: "hidden",
     borderWidth: 1, borderColor: isDark ? "#27272a" : "#e4e4e7",
   },
-  cardHeader: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
-  icon: { width: 52, height: 52, borderRadius: 12 },
+  sectionHeader: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end",
+    paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12,
+    borderBottomWidth: 1, borderBottomColor: isDark ? "#27272a" : "#f2f2f7",
+  },
+  sectionTitle: { fontSize: 17, fontWeight: "700", color: isDark ? "#ffffff" : "#09090b" },
+  sectionSubtitle: { fontSize: 12, color: isDark ? "#71717a" : "#a1a1aa", marginTop: 2 },
+  featuredCard: {
+    width: 120, alignItems: "center", paddingVertical: 12,
+  },
+  featuredName: { fontSize: 12, fontWeight: "600", color: isDark ? "#ffffff" : "#09090b", marginTop: 8, textAlign: "center" },
+  featuredUser: { fontSize: 11, color: isDark ? "#71717a" : "#a1a1aa", marginTop: 2, textAlign: "center" },
   iconPlaceholder: {
-    width: 52, height: 52, borderRadius: 12,
     backgroundColor: isDark ? "#27272a" : "#f4f4f5",
     alignItems: "center", justifyContent: "center",
   },
-  iconText: { fontSize: 22, fontWeight: "700", color: isDark ? "#71717a" : "#a1a1aa" },
-  appName: { fontSize: 16, fontWeight: "600", color: isDark ? "#ffffff" : "#09090b" },
-  username: { fontSize: 12, color: isDark ? "#71717a" : "#a1a1aa", maxWidth: 100 },
-  heartIcon: { fontSize: 16, color: "#ef4444" },
-  likesCount: { fontSize: 12, color: isDark ? "#71717a" : "#a1a1aa" },
-  tagline: { fontSize: 13, color: isDark ? "#a1a1aa" : "#71717a", marginBottom: 10 },
-  tagsRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 },
-  statusText: { fontSize: 11, fontWeight: "600" },
-  tag: {
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99,
-    backgroundColor: isDark ? "#27272a" : "#f4f4f5",
+  getBtn: {
+    marginTop: 8, backgroundColor: isDark ? "#27272a" : "#f2f2f7",
+    paddingHorizontal: 16, paddingVertical: 6, borderRadius: 99,
   },
-  tagText: { fontSize: 11, color: isDark ? "#a1a1aa" : "#71717a" },
-  emptyText: { fontSize: 14, color: isDark ? "#71717a" : "#a1a1aa", marginBottom: 16 },
-  emptyBtn: { backgroundColor: isDark ? "#ffffff" : "#09090b", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 99 },
-  emptyBtnText: { color: isDark ? "#09090b" : "#ffffff", fontWeight: "600", fontSize: 14 },
+  getBtnText: { fontSize: 13, fontWeight: "600", color: isDark ? "#ffffff" : "#09090b" },
+  rowCard: { flexDirection: "row", alignItems: "center", paddingVertical: 12 },
+  rowName: { fontSize: 15, fontWeight: "600", color: isDark ? "#ffffff" : "#09090b" },
+  rowTagline: { fontSize: 12, color: isDark ? "#71717a" : "#a1a1aa", marginTop: 2 },
+  rowUser: { fontSize: 11, color: isDark ? "#52525b" : "#a1a1aa", marginTop: 2 },
+  likeCount: { fontSize: 11, color: isDark ? "#71717a" : "#a1a1aa" },
+  divider: { height: 1, backgroundColor: isDark ? "#27272a" : "#f2f2f7" },
+  loadingText: { fontSize: 14, color: isDark ? "#71717a" : "#a1a1aa" },
 });
