@@ -1,12 +1,71 @@
-import { useEffect } from "react";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useColorScheme } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { ThemeProvider, useTheme } from "@/lib/theme";
 import "react-native-url-polyfill/auto";
+import { useEffect, useRef } from "react";
+import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
+import { supabase } from "@/lib/supabase";
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
+
+async function registerForPushNotificationsAsync(): Promise<string | null> {
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("default", {
+      name: "default",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+    });
+  }
+
+  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  let finalStatus = existingStatus;
+  if (existingStatus !== "granted") {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+  if (finalStatus !== "granted") return null;
+
+  const token = await Notifications.getExpoPushTokenAsync({
+    projectId: "2b0e43f0-a513-4433-b622-12b79a50c7fa",
+  });
+  return token.data;
+}
+
+function RootLayoutInner() {
+  const { isDark } = useTheme();
+  const router = useRouter();
+  const responseListener = useRef<Notifications.EventSubscription | null>(null);
+
+  useEffect(() => {
+    // Push token registration
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+      const token = await registerForPushNotificationsAsync();
+      if (!token) return;
+      await supabase
+        .from("aa_push_tokens")
+        .upsert({ user_id: data.user.id, token }, { onConflict: "user_id,token" });
+    });
+
+    // Handle notification taps → navigate to app detail
+    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
+      const appId = response.notification.request.content.data?.app_id as string | undefined;
+      if (appId) router.push(`/apps/${appId}`);
+    });
+
+    return () => {
+      responseListener.current?.remove();
+    };
+  }, []);
 
   return (
     <>
@@ -20,12 +79,23 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="apps/[id]" options={{ title: "" }} />
+        <Stack.Screen name="apps/[id]/index" options={{ title: "" }} />
         <Stack.Screen name="apps/[id]/edit" options={{ title: "編集" }} />
         <Stack.Screen name="users/[username]" options={{ title: "" }} />
-        <Stack.Screen name="submit" options={{ title: "アプリを投稿" }} />
         <Stack.Screen name="auth" options={{ title: "ログイン", headerShown: false }} />
       </Stack>
     </>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <RootLayoutInner />
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

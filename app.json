@@ -6,24 +6,43 @@
     "orientation": "portrait",
     "scheme": "appatelier",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.appatelier.app"
+      "bundleIdentifier": "com.appatelier.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
       },
-      "package": "com.appatelier.app"
+      "package": "com.appatelier.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
       [
         "expo-image-picker",
-        { "photosPermission": "アプリのアイコンや画像を選択するためにフォトライブラリへのアクセスが必要です。" }
+        {
+          "photosPermission": "アプリのアイコンや画像を選択するためにフォトライブラリへのアクセスが必要です。"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "iosDisplayInForeground": true
+        }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2b0e43f0-a513-4433-b622-12b79a50c7fa"
+      }
+    }
   }
 }
