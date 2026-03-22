@@ -122,6 +122,19 @@ export default function ProfileScreen() {
 
   const handleSave = async () => {
     if (!user) return;
+
+    const RESERVED = ["admin", "master", "administrator", "root", "support", "official", "appatelier", "app_atelier", "system", "moderator", "mod", "staff", "help"];
+    if (RESERVED.includes(username.trim().toLowerCase())) {
+      Alert.alert("エラー", "そのユーザー名は使用できません");
+      return;
+    }
+
+    const urlFields = [twitterUrl, githubUrl, websiteUrl].filter(Boolean);
+    if (urlFields.some((u) => !/^https?:\/\//i.test(u))) {
+      Alert.alert("エラー", "URLはhttpまたはhttpsで始めてください");
+      return;
+    }
+
     setSaving(true);
     const now = new Date().toISOString();
     await supabase.from("aa_profiles").upsert({

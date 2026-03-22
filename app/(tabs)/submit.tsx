@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, useColorScheme, Image, Alert, ActivityIndicator,
+  StyleSheet, Image, Alert, ActivityIndicator,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
+import { useTheme } from "@/lib/theme";
 import { PLATFORM_TAGS, CATEGORY_TAGS, SPECIAL_TAGS } from "@/lib/tags";
 import { isPremiumBadge } from "@/components/Badge";
 import type { User } from "@supabase/supabase-js";
@@ -30,7 +31,7 @@ async function uploadImage(uri: string, path: string): Promise<string> {
 }
 
 export default function SubmitScreen() {
-  const isDark = useColorScheme() === "dark";
+  const { isDark } = useTheme();
   const s = styles(isDark);
   const router = useRouter();
 
@@ -133,7 +134,8 @@ export default function SubmitScreen() {
         { text: "OK", onPress: () => router.replace("/(tabs)") },
       ]);
     } catch (err: unknown) {
-      Alert.alert("エラー", err instanceof Error ? err.message : "投稿に失敗しました");
+      const msg = err instanceof Error ? err.message : "投稿に失敗しました。時間をおいて再試行してください";
+      Alert.alert("エラー", msg);
     } finally {
       setSubmitting(false);
     }
@@ -175,7 +177,7 @@ export default function SubmitScreen() {
       <TextInput style={s.input} value={tagline} onChangeText={setTagline} placeholder="一言でアプリを説明" placeholderTextColor={isDark ? "#52525b" : "#a1a1aa"} maxLength={100} />
 
       <Text style={s.label}>説明</Text>
-      <TextInput style={[s.input, { height: 100, textAlignVertical: "top" }]} value={description} onChangeText={setDescription} placeholder="アプリの詳細説明..." placeholderTextColor={isDark ? "#52525b" : "#a1a1aa"} multiline />
+      <TextInput style={[s.input, { height: 100, textAlignVertical: "top" }]} value={description} onChangeText={setDescription} placeholder="アプリの詳細説明..." placeholderTextColor={isDark ? "#52525b" : "#a1a1aa"} multiline maxLength={3000} />
 
       {/* Screenshots */}
       <Text style={s.label}>スクリーンショット（最大{maxScreenshots}枚）</Text>

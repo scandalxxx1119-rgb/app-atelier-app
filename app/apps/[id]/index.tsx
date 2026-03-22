@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, useColorScheme, Image, ActivityIndicator, Share, Linking,
+  StyleSheet, Image, ActivityIndicator, Share, Linking,
   Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import { supabase } from "@/lib/supabase";
+import { useTheme } from "@/lib/theme";
 import Badge, { BadgeType } from "@/components/Badge";
 import type { User } from "@supabase/supabase-js";
 
@@ -25,7 +26,7 @@ type Application = { id: string; user_id: string; status: string; message: strin
 
 export default function AppDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const isDark = useColorScheme() === "dark";
+  const { isDark } = useTheme();
   const s = styles(isDark);
   const router = useRouter();
 
@@ -49,7 +50,7 @@ export default function AppDetailScreen() {
 
     supabase.from("aa_apps").select("*").eq("id", id).single()
       .then(({ data }) => {
-        if (!data) return;
+        if (!data || data.is_hidden) { router.replace("/"); return; }
         setApp(data as App);
         supabase.from("aa_profiles").select("id, username, badge, avatar_url")
           .eq("id", data.user_id).single()
@@ -105,6 +106,10 @@ export default function AppDetailScreen() {
     if (data) {
       setComments((prev) => [...prev, data as Comment]);
       setCommentProfiles((prev) => ({ ...prev, [user.id]: prev[user.id] ?? user.email ?? "?" }));
+      await supabase.from("aa_points").insert({
+        user_id: user.id, amount: 2,
+        reason: `「${app?.name}」にコメント`, app_id: id,
+      });
     }
     setComment("");
     setSubmitting(false);
@@ -119,12 +124,10 @@ export default function AppDetailScreen() {
     if (data) {
       setApplication(data as Application);
       setTotalApplicants((n) => n + 1);
-      if (app?.tester_reward_points) {
-        await supabase.from("aa_points").insert({
-          user_id: user.id, amount: app.tester_reward_points,
-          reason: `「${app.name}」のテスターに参加`, app_id: id,
-        });
-      }
+      await supabase.from("aa_points").insert({
+        user_id: user.id, amount: 1,
+        reason: `「${app?.name}」のテスターに申請`, app_id: id,
+      });
     }
     setApplyOpen(false);
     setApplying(false);
@@ -165,9 +168,14 @@ export default function AppDetailScreen() {
               <Text style={[s.statusText, { color: statusColor.text }]}>{statusColor.label}</Text>
             </View>
             {isOwner && (
-              <TouchableOpacity onPress={() => router.push(`/apps/${app.id}/edit`)}>
-                <Text style={s.editLink}>編集</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <TouchableOpacity onPress={() => router.push(`/apps/${app.id}/edit`)}>
+                  <Text style={s.editLink}>編集</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => router.push(`/apps/${app.id}/testers`)}>
+                  <Text style={s.editLink}>テスター管理</Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         </View>
@@ -323,6 +331,7 @@ export default function AppDetailScreen() {
               onChangeText={setComment}
               placeholder="コメントを書く..."
               placeholderTextColor={isDark ? "#52525b" : "#a1a1aa"}
+              maxLength={500}
             />
             <TouchableOpacity
               style={[s.sendBtn, (!comment.trim() || submitting) && { opacity: 0.4 }]}
