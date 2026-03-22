@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, Image, Alert, ActivityIndicator,
+  StyleSheet, Image, Alert, ActivityIndicator, Linking,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
@@ -383,6 +383,21 @@ export default function ProfileScreen() {
         )}
       </View>
 
+      {/* Legal links */}
+      <View style={s.legalSection}>
+        <TouchableOpacity onPress={() => Linking.openURL("https://app-atelier.vercel.app/terms")}>
+          <Text style={s.legalLink}>利用規約</Text>
+        </TouchableOpacity>
+        <Text style={s.legalSep}>·</Text>
+        <TouchableOpacity onPress={() => Linking.openURL("https://app-atelier.vercel.app/privacy")}>
+          <Text style={s.legalLink}>プライバシーポリシー</Text>
+        </TouchableOpacity>
+        <Text style={s.legalSep}>·</Text>
+        <TouchableOpacity onPress={() => Linking.openURL("https://app-atelier.vercel.app/contact")}>
+          <Text style={s.legalLink}>お問い合わせ</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Sign out */}
       <TouchableOpacity style={s.signOutBtn} onPress={handleSignOut}>
         <Text style={s.signOutBtnText}>ログアウト</Text>
@@ -425,6 +440,9 @@ const styles = (isDark: boolean) => StyleSheet.create({
   actionBtnText: { fontSize: 13, color: isDark ? "#ffffff" : "#09090b" },
   deleteBtn: { borderColor: "#fca5a5" },
   deleteBtnText: { fontSize: 13, color: "#ef4444" },
+  legalSection: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8, marginBottom: 16 },
+  legalLink: { fontSize: 13, color: isDark ? "#71717a" : "#a1a1aa", textDecorationLine: "underline" },
+  legalSep: { fontSize: 13, color: isDark ? "#3f3f46" : "#d4d4d8" },
   signOutBtn: { borderRadius: 10, paddingVertical: 14, alignItems: "center", borderWidth: 1, borderColor: isDark ? "#3f3f46" : "#e4e4e7" },
   signOutBtnText: { fontSize: 15, color: isDark ? "#71717a" : "#a1a1aa" },
   shopRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: isDark ? "#27272a" : "#f4f4f5" },
