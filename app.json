@@ -3,21 +3,31 @@
     "name": "App Atelier",
     "slug": "app-atelier-app",
     "version": "1.0.0",
+    "description": "個人開発者がアプリを投稿・発信・応援できる日本語特化コミュニティ",
     "orientation": "portrait",
     "scheme": "appatelier",
     "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#09090b"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.appatelier.app",
+      "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#09090b"
       },
       "package": "com.appatelier.app",
+      "versionCode": 1,
       "permissions": [
         "android.permission.RECORD_AUDIO"
       ]

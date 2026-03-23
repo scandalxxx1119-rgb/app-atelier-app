@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, useColorScheme, Image, Alert, ActivityIndicator,
+  StyleSheet, Image, Alert, ActivityIndicator,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
+import { useTheme } from "@/lib/theme";
 import { PLATFORM_TAGS, CATEGORY_TAGS, SPECIAL_TAGS } from "@/lib/tags";
 import { isPremiumBadge } from "@/components/Badge";
 
@@ -28,7 +29,7 @@ async function uploadImage(uri: string, path: string): Promise<string> {
 
 export default function EditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const isDark = useColorScheme() === "dark";
+  const { isDark } = useTheme();
   const s = styles(isDark);
   const router = useRouter();
 
@@ -61,7 +62,7 @@ export default function EditScreen() {
 
       const [appRes, profileRes] = await Promise.all([
         supabase.from("aa_apps").select("*").eq("id", id).single(),
-        supabase.from("aa_profiles").select("badge, is_premium").eq("id", auth.user.id).single(),
+        supabase.from("aa_profiles").select("badge, is_premium, screenshot_extended").eq("id", auth.user.id).single(),
       ]);
 
       if (!appRes.data || appRes.data.user_id !== auth.user.id) {
@@ -85,7 +86,7 @@ export default function EditScreen() {
       setTesterPoints(String(app.tester_reward_points ?? 10));
       setIconUrl(app.icon_url ?? null);
       setExistingScreenshots(app.screenshot_urls ?? []);
-      setIsPremium(isPremiumBadge(profileRes.data?.badge) || profileRes.data?.is_premium === true);
+      setIsPremium(isPremiumBadge(profileRes.data?.badge) || profileRes.data?.is_premium === true || profileRes.data?.screenshot_extended === true);
       setLoading(false);
     })();
   }, [id]);

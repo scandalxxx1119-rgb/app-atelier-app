@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  useColorScheme, Image, ActivityIndicator, Linking,
+   Image, ActivityIndicator, Linking,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
+import { useTheme } from "@/lib/theme";
 import Badge, { BadgeType } from "@/components/Badge";
 
 type Profile = {
@@ -19,7 +20,7 @@ type App = {
 
 export default function UserProfileScreen() {
   const { username } = useLocalSearchParams<{ username: string }>();
-  const isDark = useColorScheme() === "dark";
+  const { isDark } = useTheme();
   const s = styles(isDark);
   const router = useRouter();
 
@@ -68,31 +69,38 @@ export default function UserProfileScreen() {
           </View>
         )}
         <View style={{ flex: 1, marginLeft: 16 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
             <Text style={s.username}>{profile.username}</Text>
             {profile.badge && <Badge badge={profile.badge as BadgeType} />}
           </View>
           {profile.bio && <Text style={s.bio}>{profile.bio}</Text>}
-          <View style={s.linksRow}>
-            <Text style={s.appCount}>{apps.length}個のアプリ</Text>
-            {profile.twitter_url && (
-              <TouchableOpacity onPress={() => Linking.openURL(profile.twitter_url!)}>
-                <Text style={s.link}>𝕏</Text>
-              </TouchableOpacity>
-            )}
-            {profile.github_url && (
-              <TouchableOpacity onPress={() => Linking.openURL(profile.github_url!)}>
-                <Text style={s.link}>GitHub</Text>
-              </TouchableOpacity>
-            )}
-            {profile.website_url && (
-              <TouchableOpacity onPress={() => Linking.openURL(profile.website_url!)}>
-                <Text style={s.link}>🌐 Web</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <Text style={s.appCount}>{apps.length}個のアプリ</Text>
         </View>
       </View>
+
+      {/* External links */}
+      {(profile.twitter_url || profile.github_url || profile.website_url) && (
+        <View style={s.linksRow}>
+          {profile.twitter_url && (
+            <TouchableOpacity style={s.linkBtn} onPress={() => Linking.openURL(profile.twitter_url!)}>
+              <Text style={s.linkBtnIcon}>𝕏</Text>
+              <Text style={s.linkBtnText}>Twitter</Text>
+            </TouchableOpacity>
+          )}
+          {profile.github_url && (
+            <TouchableOpacity style={s.linkBtn} onPress={() => Linking.openURL(profile.github_url!)}>
+              <Text style={s.linkBtnIcon}>🐙</Text>
+              <Text style={s.linkBtnText}>GitHub</Text>
+            </TouchableOpacity>
+          )}
+          {profile.website_url && (
+            <TouchableOpacity style={s.linkBtn} onPress={() => Linking.openURL(profile.website_url!)}>
+              <Text style={s.linkBtnIcon}>🌐</Text>
+              <Text style={s.linkBtnText}>Website</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {/* Apps list */}
       <View style={{ gap: 12 }}>
@@ -134,9 +142,17 @@ const styles = (isDark: boolean) => StyleSheet.create({
   avatarInitial: { fontSize: 28, fontWeight: "700", color: isDark ? "#71717a" : "#a1a1aa" },
   username: { fontSize: 20, fontWeight: "700", color: isDark ? "#ffffff" : "#09090b" },
   bio: { fontSize: 13, color: isDark ? "#a1a1aa" : "#71717a", marginBottom: 8 },
-  linksRow: { flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap" },
-  appCount: { fontSize: 12, color: isDark ? "#71717a" : "#a1a1aa" },
-  link: { fontSize: 12, fontWeight: "700", color: isDark ? "#a1a1aa" : "#71717a" },
+  appCount: { fontSize: 12, color: isDark ? "#71717a" : "#a1a1aa", marginTop: 4 },
+  linksRow: { flexDirection: "row", gap: 10, marginBottom: 20, flexWrap: "wrap" },
+  linkBtn: {
+    flex: 1, minWidth: 90, alignItems: "center", justifyContent: "center",
+    paddingVertical: 14, borderRadius: 14,
+    backgroundColor: isDark ? "#18181b" : "#ffffff",
+    borderWidth: 1, borderColor: isDark ? "#27272a" : "#e4e4e7",
+    gap: 4,
+  },
+  linkBtnIcon: { fontSize: 26, color: isDark ? "#ffffff" : "#09090b" },
+  linkBtnText: { fontSize: 12, fontWeight: "600", color: isDark ? "#a1a1aa" : "#71717a" },
   appCard: { flexDirection: "row", alignItems: "center", backgroundColor: isDark ? "#18181b" : "#ffffff", borderRadius: 14, padding: 14, borderWidth: 1, borderColor: isDark ? "#27272a" : "#e4e4e7" },
   appIcon: { width: 48, height: 48, borderRadius: 10 },
   appIconPlaceholder: { width: 48, height: 48, borderRadius: 10, backgroundColor: isDark ? "#27272a" : "#f4f4f5", alignItems: "center", justifyContent: "center" },

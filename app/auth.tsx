@@ -1,13 +1,14 @@
 import { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  useColorScheme, KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
+  KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
+import { useTheme } from "@/lib/theme";
 
 export default function AuthScreen() {
-  const isDark = useColorScheme() === "dark";
+  const { isDark } = useTheme();
   const s = styles(isDark);
   const router = useRouter();
 
@@ -16,6 +17,7 @@ export default function AuthScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
+  const [resetSent, setResetSent] = useState(false);
 
   const handleLogin = async () => {
     setLoading(true); setMsg("");
@@ -26,6 +28,19 @@ export default function AuthScreen() {
       router.replace("/(tabs)");
     }
     setLoading(false);
+  };
+
+  const handleResetPassword = async () => {
+    if (!email) { setMsg("メールアドレスを入力してください"); return; }
+    setLoading(true); setMsg("");
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    setLoading(false);
+    if (error) {
+      setMsg("送信に失敗しました: " + error.message);
+    } else {
+      setResetSent(true);
+      setMsg("パスワードリセットのメールを送信しました");
+    }
   };
 
   const handleSignUp = async () => {
@@ -75,7 +90,7 @@ export default function AuthScreen() {
           secureTextEntry
         />
 
-        {msg ? <Text style={s.msg}>{msg}</Text> : null}
+        {msg ? <Text style={[s.msg, resetSent && { color: "#22c55e" }]}>{msg}</Text> : null}
 
         <TouchableOpacity
           style={s.submitBtn}
@@ -88,6 +103,12 @@ export default function AuthScreen() {
             <Text style={s.submitBtnText}>{tab === "login" ? "ログイン" : "登録する"}</Text>
           )}
         </TouchableOpacity>
+
+        {tab === "login" && (
+          <TouchableOpacity onPress={handleResetPassword} style={{ marginTop: 16, alignItems: "center" }} disabled={loading}>
+            <Text style={s.resetLink}>パスワードをお忘れの方</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -115,4 +136,5 @@ const styles = (isDark: boolean) => StyleSheet.create({
     borderRadius: 12, paddingVertical: 16, alignItems: "center",
   },
   submitBtnText: { color: isDark ? "#09090b" : "#ffffff", fontSize: 16, fontWeight: "700" },
+  resetLink: { fontSize: 13, color: isDark ? "#71717a" : "#a1a1aa", textDecorationLine: "underline" },
 });

@@ -63,6 +63,22 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="board"
+        options={{
+          title: "掲示板",
+          tabBarLabel: "掲示板",
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 22, color }}>💬</Text>,
+        }}
+      />
+      <Tabs.Screen
+        name="ranking"
+        options={{
+          title: "ランキング",
+          tabBarLabel: "ランキング",
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 22, color }}>🏆</Text>,
+        }}
+      />
+      <Tabs.Screen
         name="search"
         options={{
           title: "検索",

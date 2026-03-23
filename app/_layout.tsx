@@ -6,8 +6,9 @@ import { ThemeProvider, useTheme } from "@/lib/theme";
 import "react-native-url-polyfill/auto";
 import { useEffect, useRef } from "react";
 import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
+import { Platform, View } from "react-native";
 import { supabase } from "@/lib/supabase";
+import LoginBonus from "@/components/LoginBonus";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -68,7 +69,7 @@ function RootLayoutInner() {
   }, []);
 
   return (
-    <>
+    <View style={{ flex: 1 }}>
       <StatusBar style={isDark ? "light" : "dark"} />
       <Stack
         screenOptions={{
@@ -82,9 +83,11 @@ function RootLayoutInner() {
         <Stack.Screen name="apps/[id]/index" options={{ title: "" }} />
         <Stack.Screen name="apps/[id]/edit" options={{ title: "編集" }} />
         <Stack.Screen name="users/[username]" options={{ title: "" }} />
+        <Stack.Screen name="board/[postId]" options={{ title: "スレッド" }} />
         <Stack.Screen name="auth" options={{ title: "ログイン", headerShown: false }} />
       </Stack>
-    </>
+      <LoginBonus />
+    </View>
   );
 }
 
