@@ -398,15 +398,15 @@ export default function ProfileScreen() {
 
       {/* Legal links */}
       <View style={s.legalSection}>
-        <TouchableOpacity onPress={() => Linking.openURL("https://app-atelier.vercel.app/terms")}>
+        <TouchableOpacity onPress={() => Linking.openURL("https://appatelier.dev/terms")}>
           <Text style={s.legalLink}>利用規約</Text>
         </TouchableOpacity>
         <Text style={s.legalSep}>·</Text>
-        <TouchableOpacity onPress={() => Linking.openURL("https://app-atelier.vercel.app/privacy")}>
+        <TouchableOpacity onPress={() => Linking.openURL("https://appatelier.dev/privacy")}>
           <Text style={s.legalLink}>プライバシーポリシー</Text>
         </TouchableOpacity>
         <Text style={s.legalSep}>·</Text>
-        <TouchableOpacity onPress={() => Linking.openURL("https://app-atelier.vercel.app/contact")}>
+        <TouchableOpacity onPress={() => Linking.openURL("https://appatelier.dev/contact")}>
           <Text style={s.legalLink}>お問い合わせ</Text>
         </TouchableOpacity>
       </View>
