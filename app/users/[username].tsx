@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-   Image, ActivityIndicator, Linking,
+   Image, ActivityIndicator, Linking, Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
@@ -27,8 +27,13 @@ export default function UserProfileScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [apps, setApps] = useState<App[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blocking, setBlocking] = useState(false);
 
   useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null));
+
     supabase.from("aa_profiles")
       .select("id, username, badge, bio, twitter_url, github_url, website_url, avatar_url")
       .eq("username", decodeURIComponent(username as string)).single()
@@ -42,6 +47,47 @@ export default function UserProfileScreen() {
         setLoading(false);
       });
   }, [username]);
+
+  useEffect(() => {
+    if (!currentUserId || !profile) return;
+    supabase.from("aa_blocks")
+      .select("id")
+      .eq("blocker_id", currentUserId)
+      .eq("blocked_id", profile.id)
+      .maybeSingle()
+      .then(({ data }) => setIsBlocked(!!data));
+  }, [currentUserId, profile]);
+
+  const handleBlock = async () => {
+    if (!currentUserId || !profile) return;
+    const action = isBlocked ? "ブロックを解除" : "ブロック";
+    Alert.alert(
+      `${profile.username}を${action}しますか？`,
+      isBlocked ? "このユーザーのブロックを解除します。" : "このユーザーのコンテンツが非表示になります。",
+      [
+        { text: "キャンセル", style: "cancel" },
+        {
+          text: action,
+          style: isBlocked ? "default" : "destructive",
+          onPress: async () => {
+            setBlocking(true);
+            if (isBlocked) {
+              await supabase.from("aa_blocks")
+                .delete()
+                .eq("blocker_id", currentUserId)
+                .eq("blocked_id", profile.id);
+              setIsBlocked(false);
+            } else {
+              await supabase.from("aa_blocks")
+                .insert({ blocker_id: currentUserId, blocked_id: profile.id });
+              setIsBlocked(true);
+            }
+            setBlocking(false);
+          },
+        },
+      ]
+    );
+  };
 
   if (loading) return <ActivityIndicator style={{ flex: 1 }} />;
   if (!profile) return (
@@ -77,6 +123,19 @@ export default function UserProfileScreen() {
           <Text style={s.appCount}>{apps.length}個のアプリ</Text>
         </View>
       </View>
+
+      {/* Block button (other users only) */}
+      {currentUserId && currentUserId !== profile.id && (
+        <TouchableOpacity
+          onPress={handleBlock}
+          disabled={blocking}
+          style={[s.blockBtn, isBlocked && s.blockBtnActive]}
+        >
+          <Text style={[s.blockBtnText, isBlocked && s.blockBtnTextActive]}>
+            {isBlocked ? "ブロック解除" : "ブロック"}
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {/* External links */}
       {(profile.twitter_url || profile.github_url || profile.website_url) && (
@@ -161,4 +220,19 @@ const styles = (isDark: boolean) => StyleSheet.create({
   statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99 },
   statusText: { fontSize: 10, fontWeight: "600" },
   likesCount: { fontSize: 11, color: isDark ? "#71717a" : "#a1a1aa" },
+  blockBtn: {
+    alignSelf: "flex-end",
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: isDark ? "#3f3f46" : "#d4d4d8",
+    marginBottom: 16,
+  },
+  blockBtnActive: {
+    borderColor: isDark ? "#7f1d1d" : "#fca5a5",
+    backgroundColor: isDark ? "#1c0a0a" : "#fff1f2",
+  },
+  blockBtnText: { fontSize: 12, fontWeight: "600", color: isDark ? "#a1a1aa" : "#71717a" },
+  blockBtnTextActive: { color: isDark ? "#f87171" : "#dc2626" },
 });

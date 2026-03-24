@@ -44,6 +44,7 @@ export default function AppDetailScreen() {
   const [applyOpen, setApplyOpen] = useState(false);
   const [applying, setApplying] = useState(false);
   const [totalApplicants, setTotalApplicants] = useState(0);
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
@@ -82,6 +83,10 @@ export default function AppDetailScreen() {
       .maybeSingle().then(({ data }) => setLiked(!!data));
     supabase.from("aa_tester_applications").select("*").eq("app_id", id).eq("user_id", user.id)
       .maybeSingle().then(({ data }) => setApplication(data as Application | null));
+    supabase.from("aa_blocks").select("blocked_id").eq("blocker_id", user.id)
+      .then(({ data }) => {
+        if (data) setBlockedIds(new Set(data.map((b: { blocked_id: string }) => b.blocked_id)));
+      });
   }, [user, id]);
 
   const handleLike = async () => {
@@ -307,8 +312,8 @@ export default function AppDetailScreen() {
 
       {/* Comments */}
       <View style={{ paddingHorizontal: 16 }}>
-        <Text style={s.sectionTitle}>コメント（{comments.length}）</Text>
-        {comments.map((c) => (
+        <Text style={s.sectionTitle}>コメント（{comments.filter((c) => !blockedIds.has(c.user_id)).length}）</Text>
+        {comments.filter((c) => !blockedIds.has(c.user_id)).map((c) => (
           <View key={c.id} style={s.commentItem}>
             <View style={s.commentAvatar}>
               <Text style={{ fontSize: 12, fontWeight: "700", color: isDark ? "#a1a1aa" : "#71717a" }}>
