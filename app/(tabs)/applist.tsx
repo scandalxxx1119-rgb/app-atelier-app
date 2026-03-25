@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import FilteredAppList from "@/components/FilteredAppList";
 import { useTheme } from "@/lib/theme";
 
-const PLATFORM_FILTERS = ["iOS", "Android", "Mac", "Windows", "クロスプラットフォーム"];
+const PLATFORM_FILTERS = ["iOS", "Mac", "Windows", "クロスプラットフォーム"];
 
 export default function AppListScreen() {
   const { isDark } = useTheme();

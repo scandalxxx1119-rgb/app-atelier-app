@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, Image, Alert, ActivityIndicator,
+  StyleSheet, Image, Alert, ActivityIndicator, Platform,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
@@ -231,8 +231,12 @@ export default function SubmitScreen() {
       {/* Store links */}
       <Text style={s.sectionTitle}>ストアリンク</Text>
       <TextInput style={s.input} value={appStoreUrl} onChangeText={setAppStoreUrl} placeholder="🍎 App Store URL" placeholderTextColor={isDark ? "#52525b" : "#a1a1aa"} autoCapitalize="none" keyboardType="url" />
-      <View style={{ height: 8 }} />
-      <TextInput style={s.input} value={playStoreUrl} onChangeText={setPlayStoreUrl} placeholder="▶ Google Play URL" placeholderTextColor={isDark ? "#52525b" : "#a1a1aa"} autoCapitalize="none" keyboardType="url" />
+      {Platform.OS !== "ios" && (
+        <>
+          <View style={{ height: 8 }} />
+          <TextInput style={s.input} value={playStoreUrl} onChangeText={setPlayStoreUrl} placeholder="▶ Google Play URL" placeholderTextColor={isDark ? "#52525b" : "#a1a1aa"} autoCapitalize="none" keyboardType="url" />
+        </>
+      )}
       <View style={{ height: 8 }} />
       <TextInput style={s.input} value={url} onChangeText={setUrl} placeholder="🌐 Web サイト URL" placeholderTextColor={isDark ? "#52525b" : "#a1a1aa"} autoCapitalize="none" keyboardType="url" />
 

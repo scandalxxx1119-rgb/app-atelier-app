@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Image, ActivityIndicator, Share, Linking,
-  Alert,
+  Alert, Platform,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
@@ -223,7 +223,7 @@ export default function AppDetailScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16, marginBottom: 20 }}>
         <View style={{ flexDirection: "row", gap: 10 }}>
           {app.app_store_url && <TouchableOpacity style={s.actionBtn} onPress={() => Linking.openURL(app.app_store_url!)}><Text style={s.actionBtnText}>🍎 App Store</Text></TouchableOpacity>}
-          {app.play_store_url && <TouchableOpacity style={s.actionBtn} onPress={() => Linking.openURL(app.play_store_url!)}><Text style={s.actionBtnText}>▶ Google Play</Text></TouchableOpacity>}
+          {Platform.OS !== "ios" && app.play_store_url && <TouchableOpacity style={s.actionBtn} onPress={() => Linking.openURL(app.play_store_url!)}><Text style={s.actionBtnText}>▶ Google Play</Text></TouchableOpacity>}
           {app.url && <TouchableOpacity style={s.actionBtnOutline} onPress={() => Linking.openURL(app.url!)}><Text style={s.actionBtnOutlineText}>🌐 Web</Text></TouchableOpacity>}
           {app.github_url && <TouchableOpacity style={s.actionBtnOutline} onPress={() => Linking.openURL(app.github_url!)}><Text style={s.actionBtnOutlineText}>🐙 GitHub</Text></TouchableOpacity>}
           {app.twitter_url && <TouchableOpacity style={s.actionBtnOutline} onPress={() => Linking.openURL(app.twitter_url!)}><Text style={s.actionBtnOutlineText}>𝕏 フォロー</Text></TouchableOpacity>}
