@@ -12,6 +12,7 @@ type Profile = {
   id: string; username: string; badge: string | null;
   bio: string | null; twitter_url: string | null;
   github_url: string | null; website_url: string | null; avatar_url: string | null;
+  text_color: string | null; avatar_border_color: string | null; card_color: string | null;
 };
 type App = {
   id: string; name: string; tagline: string;
@@ -38,7 +39,7 @@ export default function UserProfileScreen() {
     supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null));
 
     supabase.from("aa_profiles")
-      .select("id, username, badge, bio, twitter_url, github_url, website_url, avatar_url")
+      .select("id, username, badge, bio, twitter_url, github_url, website_url, avatar_url, text_color, avatar_border_color, card_color")
       .eq("username", decodeURIComponent(username as string)).single()
       .then(async ({ data }) => {
         if (!data) { setLoading(false); return; }
@@ -146,15 +147,18 @@ export default function UserProfileScreen() {
       {/* Profile header */}
       <View style={s.profileHeader}>
         {profile.avatar_url ? (
-          <Image source={{ uri: profile.avatar_url }} style={s.avatar} />
+          <Image
+            source={{ uri: profile.avatar_url }}
+            style={[s.avatar, profile.avatar_border_color ? { borderWidth: 3, borderColor: profile.avatar_border_color } : null]}
+          />
         ) : (
-          <View style={s.avatarPlaceholder}>
+          <View style={[s.avatarPlaceholder, profile.avatar_border_color ? { borderWidth: 3, borderColor: profile.avatar_border_color } : null]}>
             <Text style={s.avatarInitial}>{profile.username[0].toUpperCase()}</Text>
           </View>
         )}
         <View style={{ flex: 1, marginLeft: 16 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-            <Text style={s.username}>{profile.username}</Text>
+            <Text style={[s.username, profile.text_color ? { color: profile.text_color } : null]}>{profile.username}</Text>
             {profile.badge && <Badge badge={profile.badge as BadgeType} />}
           </View>
           {profile.bio && <Text style={s.bio}>{profile.bio}</Text>}
@@ -218,7 +222,11 @@ export default function UserProfileScreen() {
         {apps.map((app) => {
           const sc = statusColor(app.status);
           return (
-            <TouchableOpacity key={app.id} style={s.appCard} onPress={() => router.push(`/apps/${app.id}`)}>
+            <TouchableOpacity
+              key={app.id}
+              style={[s.appCard, profile.card_color ? { borderLeftWidth: 4, borderLeftColor: profile.card_color } : null]}
+              onPress={() => router.push(`/apps/${app.id}`)}
+            >
               {app.icon_url ? (
                 <Image source={{ uri: app.icon_url }} style={s.appIcon} />
               ) : (

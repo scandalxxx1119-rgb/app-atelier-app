@@ -93,9 +93,9 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="board"
         options={{
-          title: "掲示板",
-          tabBarLabel: "掲示板",
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 22, color }}>💬</Text>,
+          title: "アイデア広場",
+          tabBarLabel: "アイデア",
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 22, color }}>💡</Text>,
         }}
       />
       <Tabs.Screen
@@ -104,6 +104,14 @@ export default function TabsLayout() {
           title: "検索",
           tabBarLabel: "検索",
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 22, color }}>🔍</Text>,
+        }}
+      />
+      <Tabs.Screen
+        name="gacha"
+        options={{
+          title: "ガチャ",
+          tabBarLabel: "ガチャ",
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 22, color }}>🎰</Text>,
         }}
       />
       <Tabs.Screen name="game" options={{ href: null }} />

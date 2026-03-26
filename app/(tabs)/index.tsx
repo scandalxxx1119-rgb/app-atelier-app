@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import {
-  View, Text, FlatList, TouchableOpacity,
+  View, Text, TouchableOpacity,
   StyleSheet, RefreshControl, Image, ScrollView,
+  Modal, TextInput, KeyboardAvoidingView, Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
@@ -26,10 +27,13 @@ type ActivityItem = {
   key: string;
   type: "comment" | "update" | "new_app";
   text: string;
+  subtitle?: string;
   app_id: string;
   app_name: string;
   created_at: string;
 };
+
+type MyApp = { id: string; name: string; icon_url: string | null };
 
 export default function HomeScreen() {
   const { isDark } = useTheme();
@@ -42,6 +46,12 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isDeveloper, setIsDeveloper] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
+  const [progressModal, setProgressModal] = useState(false);
+  const [myApps, setMyApps] = useState<MyApp[]>([]);
+  const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
+  const [progressText, setProgressText] = useState("");
+  const [postingProgress, setPostingProgress] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem("user_role").then((role) => setIsDeveloper(role === "developer"));
@@ -79,7 +89,8 @@ export default function HomeScreen() {
         ...updates.map((u) => ({
           key: `update-${u.id}`,
           type: "update" as const,
-          text: `${userNameMap[u.user_id] ?? "開発者"} がアップデート`,
+          text: `${userNameMap[u.user_id] ?? "開発者"} が進捗投稿`,
+          subtitle: u.title,
           app_id: u.app_id,
           app_name: appNameMap[u.app_id] ?? "",
           created_at: u.created_at,
@@ -193,6 +204,42 @@ export default function HomeScreen() {
     setRefreshing(false);
   };
 
+  const openProgressModal = async () => {
+    setFabOpen(false);
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData.user) { router.push("/auth"); return; }
+    const { data } = await supabase
+      .from("aa_apps")
+      .select("id, name, icon_url")
+      .eq("user_id", authData.user.id)
+      .order("created_at", { ascending: false });
+    setMyApps((data as MyApp[]) ?? []);
+    setSelectedAppId(null);
+    setProgressText("");
+    setProgressModal(true);
+  };
+
+  const handlePostProgress = async () => {
+    if (!selectedAppId || !progressText.trim()) return;
+    setPostingProgress(true);
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData.user) return;
+    await supabase.from("aa_app_updates").insert({
+      app_id: selectedAppId,
+      user_id: authData.user.id,
+      title: progressText.trim(),
+    });
+    await supabase.from("aa_points").insert({
+      user_id: authData.user.id,
+      amount: 5,
+      reason: "進捗投稿",
+      app_id: selectedAppId,
+    });
+    setProgressModal(false);
+    setPostingProgress(false);
+    await fetchAll();
+  };
+
   const AppIcon = ({ item, size = 44 }: { item: App; size?: number }) => (
     item.icon_url ? (
       <Image source={{ uri: item.icon_url }} style={{ width: size, height: size, borderRadius: size * 0.22 }} />
@@ -242,7 +289,14 @@ export default function HomeScreen() {
                     <Text style={s.activityIcon}>{activityIcon(item.type)}</Text>
                     <View style={{ flex: 1 }}>
                       <Text style={s.activityText} numberOfLines={1}>{item.text}</Text>
-                      <Text style={s.activityAppName} numberOfLines={1}>「{item.app_name}」</Text>
+                      {item.subtitle ? (
+                        <Text style={s.activitySubtitle} numberOfLines={1}>"{item.subtitle}"</Text>
+                      ) : (
+                        <Text style={s.activityAppName} numberOfLines={1}>「{item.app_name}」</Text>
+                      )}
+                      {item.subtitle && (
+                        <Text style={s.activityAppName} numberOfLines={1}>「{item.app_name}」</Text>
+                      )}
                     </View>
                   </TouchableOpacity>
                   {index < activity.length - 1 && <Divider />}
@@ -304,11 +358,86 @@ export default function HomeScreen() {
         </>
       )}
     </ScrollView>
-    {isDeveloper && (
-      <TouchableOpacity style={s.fab} onPress={() => router.push("/(tabs)/submit")}>
-        <Text style={s.fabText}>＋ 投稿</Text>
+
+    {isDeveloper && fabOpen && (
+      <TouchableOpacity style={s.fabOverlay} activeOpacity={1} onPress={() => setFabOpen(false)}>
+        <View style={s.fabMenu}>
+          <TouchableOpacity style={s.fabMenuItem} onPress={() => { setFabOpen(false); router.push("/(tabs)/submit"); }}>
+            <Text style={s.fabMenuIcon}>📱</Text>
+            <Text style={s.fabMenuText}>アプリを投稿</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.fabMenuItem} onPress={openProgressModal}>
+            <Text style={s.fabMenuIcon}>🛠</Text>
+            <Text style={s.fabMenuText}>今作ってます</Text>
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     )}
+
+    {isDeveloper && (
+      <TouchableOpacity style={s.fab} onPress={() => setFabOpen((v) => !v)}>
+        <Text style={s.fabText}>{fabOpen ? "✕" : "＋"}</Text>
+      </TouchableOpacity>
+    )}
+
+    {/* 進捗投稿モーダル */}
+    <Modal visible={progressModal} animationType="slide" presentationStyle="pageSheet">
+      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: isDark ? "#09090b" : "#ffffff" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ScrollView contentContainerStyle={{ padding: 20 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+            <Text style={{ fontSize: 18, fontWeight: "700", color: isDark ? "#fff" : "#09090b" }}>🛠 今作ってます</Text>
+            <TouchableOpacity onPress={() => setProgressModal(false)}>
+              <Text style={{ fontSize: 20, color: isDark ? "#71717a" : "#a1a1aa" }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={{ fontSize: 13, fontWeight: "600", color: isDark ? "#a1a1aa" : "#71717a", marginBottom: 8 }}>アプリを選択</Text>
+          {myApps.length === 0 ? (
+            <Text style={{ color: "#71717a", marginBottom: 16 }}>アプリが見つかりません</Text>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                {myApps.map((a) => (
+                  <TouchableOpacity
+                    key={a.id}
+                    onPress={() => setSelectedAppId(a.id)}
+                    style={{ alignItems: "center", opacity: selectedAppId === a.id ? 1 : 0.5 }}
+                  >
+                    {a.icon_url ? (
+                      <Image source={{ uri: a.icon_url }} style={{ width: 52, height: 52, borderRadius: 12, borderWidth: 2, borderColor: selectedAppId === a.id ? (isDark ? "#fff" : "#09090b") : "transparent" }} />
+                    ) : (
+                      <View style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: isDark ? "#27272a" : "#e4e4e7", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: selectedAppId === a.id ? (isDark ? "#fff" : "#09090b") : "transparent" }}>
+                        <Text style={{ fontSize: 20 }}>{a.name[0]}</Text>
+                      </View>
+                    )}
+                    <Text style={{ fontSize: 10, color: isDark ? "#a1a1aa" : "#71717a", marginTop: 4, width: 52, textAlign: "center" }} numberOfLines={1}>{a.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          )}
+
+          <Text style={{ fontSize: 13, fontWeight: "600", color: isDark ? "#a1a1aa" : "#71717a", marginBottom: 8 }}>一言メッセージ</Text>
+          <TextInput
+            style={{ borderWidth: 1, borderColor: isDark ? "#3f3f46" : "#e4e4e7", borderRadius: 10, padding: 12, fontSize: 14, color: isDark ? "#fff" : "#09090b", backgroundColor: isDark ? "#18181b" : "#f9f9f9", height: 80, marginBottom: 20, textAlignVertical: "top" }}
+            value={progressText}
+            onChangeText={setProgressText}
+            placeholder="例: UIのブラッシュアップ中 🎨"
+            placeholderTextColor={isDark ? "#52525b" : "#a1a1aa"}
+            multiline
+            maxLength={100}
+          />
+
+          <TouchableOpacity
+            style={{ backgroundColor: isDark ? "#fff" : "#09090b", borderRadius: 12, padding: 14, alignItems: "center", opacity: (!selectedAppId || !progressText.trim() || postingProgress) ? 0.4 : 1 }}
+            onPress={handlePostProgress}
+            disabled={!selectedAppId || !progressText.trim() || postingProgress}
+          >
+            <Text style={{ fontSize: 15, fontWeight: "700", color: isDark ? "#09090b" : "#fff" }}>{postingProgress ? "投稿中..." : "投稿する (+5pt)"}</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Modal>
     </View>
   );
 }
@@ -333,6 +462,7 @@ const styles = (isDark: boolean) => StyleSheet.create({
   },
   activityIcon: { fontSize: 18, width: 24, textAlign: "center" },
   activityText: { fontSize: 13, color: isDark ? "#d4d4d8" : "#3f3f46" },
+  activitySubtitle: { fontSize: 12, color: isDark ? "#a1a1aa" : "#52525b", marginTop: 1, fontStyle: "italic" },
   activityAppName: { fontSize: 12, color: isDark ? "#71717a" : "#a1a1aa", marginTop: 1 },
   testerCard: {
     width: 220, flexDirection: "row", alignItems: "center",
@@ -362,9 +492,29 @@ const styles = (isDark: boolean) => StyleSheet.create({
   fab: {
     position: "absolute", bottom: 24, right: 20,
     backgroundColor: isDark ? "#ffffff" : "#09090b",
-    borderRadius: 28, paddingHorizontal: 20, paddingVertical: 14,
+    borderRadius: 28, width: 56, height: 56,
+    alignItems: "center", justifyContent: "center",
     shadowColor: "#000", shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2, shadowRadius: 8, elevation: 6,
   },
-  fabText: { fontSize: 15, fontWeight: "700", color: isDark ? "#09090b" : "#ffffff" },
+  fabText: { fontSize: 22, fontWeight: "700", color: isDark ? "#09090b" : "#ffffff" },
+  fabOverlay: {
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+    justifyContent: "flex-end", alignItems: "flex-end",
+  },
+  fabMenu: {
+    marginBottom: 88, marginRight: 20,
+    backgroundColor: isDark ? "#18181b" : "#ffffff",
+    borderRadius: 14, borderWidth: 1, borderColor: isDark ? "#27272a" : "#e4e4e7",
+    overflow: "hidden",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15, shadowRadius: 10, elevation: 8,
+  },
+  fabMenuItem: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingHorizontal: 18, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: isDark ? "#27272a" : "#f4f4f5",
+  },
+  fabMenuIcon: { fontSize: 18 },
+  fabMenuText: { fontSize: 14, fontWeight: "600", color: isDark ? "#ffffff" : "#09090b" },
 });

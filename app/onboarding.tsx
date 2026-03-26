@@ -16,26 +16,26 @@ type Slide = { emoji: string; title: string; desc: string };
 const SLIDES: Record<Role, Slide[]> = {
   supporter: [
     {
-      emoji: "👥",
-      title: "気になる開発者をフォローしよう",
-      desc: "まだ世に出ていない作品もここで見られます",
+      emoji: "💡",
+      title: "欲しいアプリを投稿しよう",
+      desc: "アイデアを投稿すると開発者が実現してくれるかも",
     },
     {
-      emoji: "🧪",
-      title: "先行メンバーになろう",
-      desc: "リリース前のアプリをいち早く体験できます",
+      emoji: "👏",
+      title: "開発者を応援しよう",
+      desc: "いいねやコメントで開発者の励みになります",
     },
   ],
   developer: [
     {
       emoji: "📦",
-      title: "作品を投稿しよう",
+      title: "アプリを公開しよう",
       desc: "応援してくれる人があなたの作品を待っています",
     },
     {
-      emoji: "🧪",
-      title: "先行メンバーを募集しよう",
-      desc: "フィードバックをもらいながら一緒に開発できます",
+      emoji: "💡",
+      title: "アイデアに応えよう",
+      desc: "ユーザーの声からヒントを得て次の作品を作ろう",
     },
   ],
 };

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Image, ActivityIndicator, Share, Linking,
-  Alert, Platform,
+  Alert, Platform, Modal,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
@@ -47,6 +47,9 @@ export default function AppDetailScreen() {
   const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   const [isFollowingDev, setIsFollowingDev] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [ideaLinkModal, setIdeaLinkModal] = useState(false);
+  const [myBuilds, setMyBuilds] = useState<{ id: string; idea_id: string; idea_title: string }[]>([]);
+  const [linking, setLinking] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
@@ -165,6 +168,56 @@ export default function AppDetailScreen() {
     await Share.share({ message: `${app?.name} - ${app?.tagline}` });
   };
 
+  const openIdeaLinkModal = async () => {
+    if (!user) return;
+    const { data: builds } = await supabase
+      .from("aa_idea_builds")
+      .select("id, idea_id, app_id")
+      .eq("user_id", user.id)
+      .is("app_id", null);
+    if (!builds || builds.length === 0) {
+      Alert.alert("紐付けるアイデアがありません", "アイデア広場で「作ります」宣言をしたアイデアがここに表示されます。");
+      return;
+    }
+    const ideaIds = builds.map((b: { idea_id: string }) => b.idea_id);
+    const { data: ideas } = await supabase.from("aa_ideas").select("id, title").in("id", ideaIds);
+    const ideaMap: Record<string, string> = {};
+    (ideas ?? []).forEach((i: { id: string; title: string }) => { ideaMap[i.id] = i.title; });
+    setMyBuilds(builds.map((b: { id: string; idea_id: string }) => ({
+      id: b.id,
+      idea_id: b.idea_id,
+      idea_title: ideaMap[b.idea_id] ?? "不明",
+    })));
+    setIdeaLinkModal(true);
+  };
+
+  const handleIdeaLink = async (buildId: string, ideaId: string, ideaTitle: string) => {
+    if (!user || !app) return;
+    setLinking(true);
+    await supabase.from("aa_idea_builds").update({ app_id: app.id, status: "completed" }).eq("id", buildId);
+    // ポイント付与
+    await supabase.from("aa_points").insert({
+      user_id: user.id,
+      amount: 20,
+      reason: `「${ideaTitle}」のアイデアを実現`,
+      app_id: app.id,
+    });
+    // アイデア投稿者に通知
+    const { data: idea } = await supabase.from("aa_ideas").select("user_id").eq("id", ideaId).single();
+    if (idea && idea.user_id !== user.id) {
+      const { data: myProfile } = await supabase.from("aa_profiles").select("username").eq("id", user.id).single();
+      await supabase.from("aa_messages").insert({
+        user_id: idea.user_id,
+        title: "アイデアが実現しました！🎉",
+        body: `${myProfile?.username ?? "開発者"}さんが「${ideaTitle}」を元にアプリを完成させました`,
+        url: app.id,
+      });
+    }
+    setLinking(false);
+    setIdeaLinkModal(false);
+    Alert.alert("紐付け完了！", "+20ptを獲得しました 🎉");
+  };
+
   if (!app) return <ActivityIndicator style={{ flex: 1 }} />;
 
   const shots = app.screenshot_urls ?? [];
@@ -202,6 +255,9 @@ export default function AppDetailScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => router.push(`/apps/${app.id}/testers`)}>
                   <Text style={s.editLink}>テスター管理</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={openIdeaLinkModal}>
+                  <Text style={s.editLink}>💡 アイデアと紐付ける</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -394,6 +450,33 @@ export default function AppDetailScreen() {
           </ScrollView>
         </View>
       )}
+
+      {/* アイデア紐付けモーダル */}
+      <Modal visible={ideaLinkModal} animationType="slide" presentationStyle="pageSheet">
+        <View style={{ flex: 1, backgroundColor: isDark ? "#09090b" : "#ffffff", padding: 20 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+            <Text style={{ fontSize: 18, fontWeight: "700", color: isDark ? "#fff" : "#09090b" }}>💡 アイデアと紐付ける</Text>
+            <TouchableOpacity onPress={() => setIdeaLinkModal(false)}>
+              <Text style={{ fontSize: 20, color: isDark ? "#71717a" : "#a1a1aa" }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={{ fontSize: 13, color: isDark ? "#71717a" : "#a1a1aa", marginBottom: 16 }}>
+            「作ります」宣言したアイデアと紐付けると +20pt もらえます
+          </Text>
+          {myBuilds.map((b) => (
+            <TouchableOpacity
+              key={b.id}
+              style={{ padding: 14, borderRadius: 12, borderWidth: 1, borderColor: isDark ? "#27272a" : "#e4e4e7", marginBottom: 10, backgroundColor: isDark ? "#18181b" : "#f9f9f9" }}
+              onPress={() => handleIdeaLink(b.id, b.idea_id, b.idea_title)}
+              disabled={linking}
+            >
+              <Text style={{ fontSize: 14, fontWeight: "600", color: isDark ? "#fff" : "#09090b" }}>{b.idea_title}</Text>
+              <Text style={{ fontSize: 12, color: isDark ? "#71717a" : "#a1a1aa", marginTop: 4 }}>タップして紐付ける</Text>
+            </TouchableOpacity>
+          ))}
+          {linking && <Text style={{ textAlign: "center", color: isDark ? "#71717a" : "#a1a1aa", marginTop: 10 }}>処理中...</Text>}
+        </View>
+      </Modal>
     </ScrollView>
   );
 }

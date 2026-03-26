@@ -44,6 +44,9 @@ export default function ProfileScreen() {
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [badge, setBadge] = useState<BadgeType>(null);
   const [usernameUpdatedAt, setUsernameUpdatedAt] = useState<string | null>(null);
+  const [textColor, setTextColor] = useState<string | null>(null);
+  const [avatarBorderColor, setAvatarBorderColor] = useState<string | null>(null);
+  const [cardColor, setCardColor] = useState<string | null>(null);
   const [apps, setApps] = useState<App[]>([]);
   const [points, setPoints] = useState(0);
   const [screenshotExtended, setScreenshotExtended] = useState(false);
@@ -71,7 +74,7 @@ export default function ProfileScreen() {
 
     const [profileRes, appsRes, pointsRes, messagesRes] = await Promise.all([
       supabase.from("aa_profiles")
-        .select("username, badge, username_updated_at, bio, twitter_url, github_url, website_url, avatar_url, screenshot_extended")
+        .select("username, badge, username_updated_at, bio, twitter_url, github_url, website_url, avatar_url, screenshot_extended, text_color, avatar_border_color, card_color")
         .eq("id", auth.user.id).single(),
       supabase.from("aa_apps")
         .select("id, name, tagline, icon_url, likes_count, status")
@@ -94,6 +97,9 @@ export default function ProfileScreen() {
     const appsData = (appsRes.data as App[]) ?? [];
     setApps(appsData);
     setScreenshotExtended(profileRes.data?.screenshot_extended ?? false);
+    setTextColor(profileRes.data?.text_color ?? null);
+    setAvatarBorderColor(profileRes.data?.avatar_border_color ?? null);
+    setCardColor(profileRes.data?.card_color ?? null);
     const total = (pointsRes.data ?? []).reduce((sum: number, r: { amount: number }) => sum + r.amount, 0);
     setPoints(total);
     setMessages(messagesRes.data ?? []);
@@ -252,9 +258,12 @@ export default function ProfileScreen() {
       <View style={s.avatarRow}>
         <TouchableOpacity onPress={handleAvatarChange}>
           {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={s.avatar} />
+            <Image
+              source={{ uri: avatarUrl }}
+              style={[s.avatar, avatarBorderColor ? { borderWidth: 3, borderColor: avatarBorderColor } : null]}
+            />
           ) : (
-            <View style={s.avatarPlaceholder}>
+            <View style={[s.avatarPlaceholder, avatarBorderColor ? { borderWidth: 3, borderColor: avatarBorderColor } : null]}>
               <Text style={s.avatarInitial}>{username ? username[0].toUpperCase() : "?"}</Text>
             </View>
           )}
@@ -262,7 +271,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
         <View style={{ marginLeft: 16, flex: 1 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <Text style={s.usernameText}>{username || "未設定"}</Text>
+            <Text style={[s.usernameText, textColor ? { color: textColor } : null]}>{username || "未設定"}</Text>
             {badge && <Badge badge={badge} />}
           </View>
           <Text style={s.emailText}>{user?.email}</Text>
@@ -356,7 +365,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
         {apps.map((app) => (
-          <View key={app.id} style={s.appCard}>
+          <View key={app.id} style={[s.appCard, cardColor ? { borderLeftWidth: 4, borderLeftColor: cardColor } : null]}>
             <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
               {app.icon_url ? (
                 <Image source={{ uri: app.icon_url }} style={s.appIcon} />

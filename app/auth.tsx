@@ -6,6 +6,7 @@ import {
 import { useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/lib/theme";
+import * as AppleAuthentication from "expo-apple-authentication";
 
 export default function AuthScreen() {
   const { isDark } = useTheme();
@@ -43,6 +44,36 @@ export default function AuthScreen() {
     }
   };
 
+  const handleAppleSignIn = async () => {
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      if (!credential.identityToken) {
+        Alert.alert("エラー", "Apple認証に失敗しました");
+        return;
+      }
+      setLoading(true);
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: "apple",
+        token: credential.identityToken,
+      });
+      if (error) {
+        setMsg("Apple認証に失敗しました: " + error.message);
+      } else {
+        router.replace("/(tabs)");
+      }
+      setLoading(false);
+    } catch (e: unknown) {
+      if ((e as { code?: string }).code !== "ERR_REQUEST_CANCELED") {
+        Alert.alert("エラー", "Apple認証に失敗しました");
+      }
+    }
+  };
+
   const handleSignUp = async () => {
     setLoading(true); setMsg("");
     const { data, error } = await supabase.auth.signUp({ email, password });
@@ -70,6 +101,25 @@ export default function AuthScreen() {
             <Text style={[s.tabBtnText, tab === "signup" && s.tabBtnTextActive]}>新規登録</Text>
           </TouchableOpacity>
         </View>
+
+        {Platform.OS === "ios" && (
+          <>
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+              buttonStyle={isDark
+                ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              cornerRadius={12}
+              style={{ width: "100%", height: 50 }}
+              onPress={handleAppleSignIn}
+            />
+            <View style={s.dividerRow}>
+              <View style={s.dividerLine} />
+              <Text style={s.dividerText}>または</Text>
+              <View style={s.dividerLine} />
+            </View>
+          </>
+        )}
 
         <TextInput
           style={s.input}
@@ -137,4 +187,7 @@ const styles = (isDark: boolean) => StyleSheet.create({
   },
   submitBtnText: { color: isDark ? "#09090b" : "#ffffff", fontSize: 16, fontWeight: "700" },
   resetLink: { fontSize: 13, color: isDark ? "#71717a" : "#a1a1aa", textDecorationLine: "underline" },
+  dividerRow: { flexDirection: "row", alignItems: "center", marginVertical: 20, gap: 10 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: isDark ? "#27272a" : "#e4e4e7" },
+  dividerText: { fontSize: 13, color: isDark ? "#52525b" : "#a1a1aa" },
 });
