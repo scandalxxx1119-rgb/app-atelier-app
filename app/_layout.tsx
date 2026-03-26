@@ -87,6 +87,7 @@ function RootLayoutInner() {
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="apps/[id]/index" options={{ title: "" }} />
+        <Stack.Screen name="developer-ranking" options={{ title: "開発者ランキング" }} />
         <Stack.Screen name="apps/[id]/edit" options={{ title: "編集" }} />
         <Stack.Screen name="users/[username]" options={{ title: "" }} />
         <Stack.Screen name="board/[postId]" options={{ title: "スレッド" }} />

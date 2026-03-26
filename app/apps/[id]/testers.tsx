@@ -1,3 +1,18 @@
+// Supabase で以下のSQLを手動実行が必要：
+// ALTER TABLE aa_apps ADD COLUMN IF NOT EXISTS tester_url text;
+// CREATE TABLE IF NOT EXISTS aa_messages (
+//   id uuid primary key default gen_random_uuid(),
+//   user_id uuid references auth.users not null,
+//   app_id uuid references aa_apps(id),
+//   title text not null,
+//   body text not null,
+//   url text,
+//   is_read boolean default false,
+//   created_at timestamptz default now()
+// );
+// ALTER TABLE aa_messages enable row level security;
+// CREATE POLICY "own messages" ON aa_messages FOR ALL USING (auth.uid() = user_id);
+
 import { useEffect, useState, useCallback } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity,

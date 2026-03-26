@@ -6,6 +6,7 @@ import {
 import { useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/lib/theme";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type App = {
   id: string;
@@ -40,6 +41,11 @@ export default function HomeScreen() {
   const [newApps, setNewApps] = useState<App[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isDeveloper, setIsDeveloper] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem("user_role").then((role) => setIsDeveloper(role === "developer"));
+  }, []);
 
   const fetchAll = useCallback(async () => {
     // Activity feed: recent comments
@@ -182,6 +188,7 @@ export default function HomeScreen() {
   const Divider = () => <View style={s.divider} />;
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView
       style={s.container}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -268,6 +275,12 @@ export default function HomeScreen() {
         </>
       )}
     </ScrollView>
+    {isDeveloper && (
+      <TouchableOpacity style={s.fab} onPress={() => router.push("/(tabs)/submit")}>
+        <Text style={s.fabText}>＋ 投稿</Text>
+      </TouchableOpacity>
+    )}
+    </View>
   );
 }
 
@@ -317,4 +330,12 @@ const styles = (isDark: boolean) => StyleSheet.create({
   commentCount: { fontSize: 12, color: isDark ? "#71717a" : "#a1a1aa" },
   divider: { height: 1, backgroundColor: isDark ? "#27272a" : "#f2f2f7" },
   loadingText: { fontSize: 14, color: isDark ? "#71717a" : "#a1a1aa" },
+  fab: {
+    position: "absolute", bottom: 24, right: 20,
+    backgroundColor: isDark ? "#ffffff" : "#09090b",
+    borderRadius: 28, paddingHorizontal: 20, paddingVertical: 14,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2, shadowRadius: 8, elevation: 6,
+  },
+  fabText: { fontSize: 15, fontWeight: "700", color: isDark ? "#09090b" : "#ffffff" },
 });
