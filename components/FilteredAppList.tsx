@@ -19,6 +19,7 @@ type App = {
   user_id: string;
   username?: string;
   badge?: string | null;
+  comment_count?: number;
 };
 
 type Props = {
@@ -47,15 +48,29 @@ export default function FilteredAppList({ tag, emptyMessage }: Props) {
     const appsData = (data as App[]) ?? [];
     const userIds = [...new Set(appsData.map((a) => a.user_id))];
     if (userIds.length > 0) {
-      const { data: profiles } = await supabase
-        .from("aa_profiles").select("id, username, badge").in("id", userIds);
+      const appIds = appsData.map((a) => a.id);
+      const [profilesRes, commentsRes] = await Promise.all([
+        supabase.from("aa_profiles").select("id, username, badge").in("id", userIds),
+        appIds.length > 0
+          ? supabase.from("aa_comments").select("app_id").in("app_id", appIds)
+          : Promise.resolve({ data: [] }),
+      ]);
       const usernameMap: Record<string, string> = {};
       const badgeMap: Record<string, string | null> = {};
-      profiles?.forEach((p: { id: string; username: string; badge: string | null }) => {
+      profilesRes.data?.forEach((p: { id: string; username: string; badge: string | null }) => {
         usernameMap[p.id] = p.username;
         badgeMap[p.id] = p.badge;
       });
-      setApps(appsData.map((a) => ({ ...a, username: usernameMap[a.user_id] ?? "anonymous", badge: badgeMap[a.user_id] ?? null })));
+      const commentCountMap: Record<string, number> = {};
+      (commentsRes.data ?? []).forEach((c: { app_id: string }) => {
+        commentCountMap[c.app_id] = (commentCountMap[c.app_id] ?? 0) + 1;
+      });
+      setApps(appsData.map((a) => ({
+        ...a,
+        username: usernameMap[a.user_id] ?? "anonymous",
+        badge: badgeMap[a.user_id] ?? null,
+        comment_count: commentCountMap[a.id] ?? 0,
+      })));
     } else {
       setApps(appsData);
     }
@@ -105,9 +120,9 @@ export default function FilteredAppList({ tag, emptyMessage }: Props) {
             </View>
           </View>
         </View>
-        <View style={{ alignItems: "center", gap: 2 }}>
-          <Text style={s.heartIcon}>♥</Text>
-          <Text style={s.likesCount}>{item.likes_count}</Text>
+        <View style={{ alignItems: "center", gap: 4 }}>
+          <Text style={s.likeText}>♥ {item.likes_count}</Text>
+          <Text style={s.commentText}>💬 {item.comment_count ?? 0}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -165,8 +180,8 @@ const styles = (isDark: boolean) => StyleSheet.create({
   username: { fontSize: 11, color: isDark ? "#52525b" : "#a1a1aa" },
   statusBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 99 },
   statusText: { fontSize: 10, fontWeight: "600" },
-  heartIcon: { fontSize: 14, color: "#ef4444" },
-  likesCount: { fontSize: 11, color: isDark ? "#71717a" : "#a1a1aa" },
+  likeText: { fontSize: 12, color: "#ef4444" },
+  commentText: { fontSize: 12, color: isDark ? "#71717a" : "#a1a1aa" },
   separator: { height: 1, backgroundColor: isDark ? "#27272a" : "#f2f2f7", marginLeft: 16 + 24 + 8 + 56 + 12 },
   emptyText: { fontSize: 14, color: isDark ? "#71717a" : "#a1a1aa" },
 });

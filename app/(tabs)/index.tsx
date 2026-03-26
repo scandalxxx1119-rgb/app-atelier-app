@@ -18,6 +18,7 @@ type App = {
   user_id: string;
   username?: string;
   tester_slots?: number;
+  comment_count?: number;
 };
 
 type ActivityItem = {
@@ -127,10 +128,22 @@ export default function HomeScreen() {
 
     if (newRes && newRes.length > 0) {
       const nUserIds = [...new Set(newRes.map((a: App) => a.user_id))];
-      const { data: nProfiles } = await supabase.from("aa_profiles").select("id, username").in("id", nUserIds);
+      const nAppIds = newRes.map((a: App) => a.id);
+      const [nProfilesRes, nCommentsRes] = await Promise.all([
+        supabase.from("aa_profiles").select("id, username").in("id", nUserIds),
+        supabase.from("aa_comments").select("app_id").in("app_id", nAppIds),
+      ]);
       const nMap: Record<string, string> = {};
-      nProfiles?.forEach((p: { id: string; username: string }) => { nMap[p.id] = p.username; });
-      setNewApps(newRes.map((a: App) => ({ ...a, username: nMap[a.user_id] ?? "anonymous" })));
+      nProfilesRes.data?.forEach((p: { id: string; username: string }) => { nMap[p.id] = p.username; });
+      const nCommentMap: Record<string, number> = {};
+      (nCommentsRes.data ?? []).forEach((c: { app_id: string }) => {
+        nCommentMap[c.app_id] = (nCommentMap[c.app_id] ?? 0) + 1;
+      });
+      setNewApps(newRes.map((a: App) => ({
+        ...a,
+        username: nMap[a.user_id] ?? "anonymous",
+        comment_count: nCommentMap[a.id] ?? 0,
+      })));
     }
   }, []);
 
@@ -241,7 +254,10 @@ export default function HomeScreen() {
                         <Text style={s.rowTagline} numberOfLines={1}>{item.tagline}</Text>
                         <Text style={s.rowUser} numberOfLines={1}>by {(item as App & { username?: string }).username}</Text>
                       </View>
-                      <Text style={s.likeCount}>♥ {item.likes_count}</Text>
+                      <View style={{ alignItems: "flex-end", gap: 2 }}>
+                        <Text style={s.likeCount}>♥ {item.likes_count}</Text>
+                        <Text style={s.commentCount}>💬 {item.comment_count ?? 0}</Text>
+                      </View>
                     </TouchableOpacity>
                     {index < Math.min(newApps.length, 8) - 1 && <Divider />}
                   </View>
@@ -298,6 +314,7 @@ const styles = (isDark: boolean) => StyleSheet.create({
   rowTagline: { fontSize: 12, color: isDark ? "#71717a" : "#a1a1aa", marginTop: 1 },
   rowUser: { fontSize: 11, color: isDark ? "#52525b" : "#a1a1aa", marginTop: 1 },
   likeCount: { fontSize: 12, color: "#ef4444" },
+  commentCount: { fontSize: 12, color: isDark ? "#71717a" : "#a1a1aa" },
   divider: { height: 1, backgroundColor: isDark ? "#27272a" : "#f2f2f7" },
   loadingText: { fontSize: 14, color: isDark ? "#71717a" : "#a1a1aa" },
 });

@@ -24,6 +24,7 @@ export default function TestersScreen() {
   const router = useRouter();
 
   const [appName, setAppName] = useState("");
+  const [testerUrl, setTesterUrl] = useState<string | null>(null);
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
@@ -33,13 +34,14 @@ export default function TestersScreen() {
     if (!auth.user) { router.replace("/auth"); return; }
 
     const { data: app } = await supabase.from("aa_apps")
-      .select("name, user_id").eq("id", id).single();
+      .select("name, user_id, tester_url").eq("id", id).single();
 
     if (!app || app.user_id !== auth.user.id) {
       Alert.alert("エラー", "権限がありません");
       router.back(); return;
     }
     setAppName(app.name);
+    setTesterUrl(app.tester_url ?? null);
 
     const { data: apps } = await supabase.from("aa_tester_applications")
       .select("*").eq("app_id", id).order("created_at", { ascending: false });
@@ -65,11 +67,31 @@ export default function TestersScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleApprove = async (appId: string) => {
-    setProcessing(appId);
+  const handleApprove = async (application: Application) => {
+    setProcessing(application.id);
     await supabase.from("aa_tester_applications")
-      .update({ status: "approved" }).eq("id", appId);
-    setApplications((prev) => prev.map((a) => a.id === appId ? { ...a, status: "approved" } : a));
+      .update({ status: "approved" }).eq("id", application.id);
+
+    // Insert message to approved user's mailbox
+    await supabase.from("aa_messages").insert({
+      user_id: application.user_id,
+      app_id: id,
+      title: `「${appName}」の先行メンバーに承認されました！`,
+      body: "下のリンクからアプリを入手してください。",
+      url: testerUrl ?? null,
+    });
+
+    // Send push notification
+    await supabase.functions.invoke("send-push", {
+      body: {
+        user_id: application.user_id,
+        title: `「${appName}」の先行メンバーに承認されました！`,
+        body: "タップしてアプリを入手しよう",
+        data: { app_id: id },
+      },
+    });
+
+    setApplications((prev) => prev.map((a) => a.id === application.id ? { ...a, status: "approved" } : a));
     setProcessing(null);
   };
 
@@ -139,7 +161,7 @@ export default function TestersScreen() {
               {app.status === "pending" && (
                 <TouchableOpacity
                   style={[s.approveBtn, processing === app.id && { opacity: 0.5 }]}
-                  onPress={() => handleApprove(app.id)}
+                  onPress={() => handleApprove(app)}
                   disabled={processing === app.id}
                 >
                   <Text style={s.approveBtnText}>承認する</Text>

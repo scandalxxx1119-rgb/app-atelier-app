@@ -38,6 +38,7 @@ export default function ProfileScreen() {
   const [screenshotExtended, setScreenshotExtended] = useState(false);
   const [activeBoosts, setActiveBoosts] = useState<{ app_id: string; type: string; expires_at: string }[]>([]);
   const [memberCount, setMemberCount] = useState<number | null>(null);
+  const [messages, setMessages] = useState<{ id: string; title: string; body: string; url: string | null; is_read: boolean; created_at: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -57,7 +58,7 @@ export default function ProfileScreen() {
     if (!auth.user) { router.replace("/auth"); return; }
     setUser(auth.user);
 
-    const [profileRes, appsRes, pointsRes] = await Promise.all([
+    const [profileRes, appsRes, pointsRes, messagesRes] = await Promise.all([
       supabase.from("aa_profiles")
         .select("username, badge, username_updated_at, bio, twitter_url, github_url, website_url, avatar_url, screenshot_extended")
         .eq("id", auth.user.id).single(),
@@ -65,6 +66,10 @@ export default function ProfileScreen() {
         .select("id, name, tagline, icon_url, likes_count, status")
         .eq("user_id", auth.user.id).order("created_at", { ascending: false }),
       supabase.from("aa_points").select("amount").eq("user_id", auth.user.id),
+      supabase.from("aa_messages")
+        .select("id, title, body, url, is_read, created_at")
+        .eq("user_id", auth.user.id)
+        .order("created_at", { ascending: false }),
     ]);
 
     setUsername(profileRes.data?.username ?? "");
@@ -80,6 +85,7 @@ export default function ProfileScreen() {
     setScreenshotExtended(profileRes.data?.screenshot_extended ?? false);
     const total = (pointsRes.data ?? []).reduce((sum: number, r: { amount: number }) => sum + r.amount, 0);
     setPoints(total);
+    setMessages(messagesRes.data ?? []);
 
     if (appsData.length > 0) {
       const now = new Date().toISOString();
@@ -162,6 +168,14 @@ export default function ProfileScreen() {
         },
       },
     ]);
+  };
+
+  const handleMessageTap = async (msg: { id: string; url: string | null; is_read: boolean }) => {
+    if (!msg.is_read) {
+      await supabase.from("aa_messages").update({ is_read: true }).eq("id", msg.id);
+      setMessages((prev) => prev.map((m) => m.id === msg.id ? { ...m, is_read: true } : m));
+    }
+    if (msg.url) Linking.openURL(msg.url);
   };
 
   const handleSignOut = async () => {
@@ -296,6 +310,31 @@ export default function ProfileScreen() {
           {saving ? <ActivityIndicator color={isDark ? "#09090b" : "#fff"} /> : <Text style={s.saveBtnText}>保存</Text>}
         </TouchableOpacity>
       </View>
+
+      {/* Mailbox */}
+      {messages.length > 0 && (
+        <View style={s.section}>
+          <Text style={s.sectionTitle}>
+            📬 メールボックス（{messages.filter((m) => !m.is_read).length > 0 ? `未読 ${messages.filter((m) => !m.is_read).length}` : messages.length}）
+          </Text>
+          {messages.map((msg) => (
+            <TouchableOpacity
+              key={msg.id}
+              style={[s.msgCard, !msg.is_read && s.msgCardUnread]}
+              onPress={() => handleMessageTap(msg)}
+            >
+              {!msg.is_read && <View style={s.unreadDot} />}
+              <View style={{ flex: 1 }}>
+                <Text style={[s.msgTitle, !msg.is_read && s.msgTitleUnread]} numberOfLines={1}>
+                  {msg.title}
+                </Text>
+                <Text style={s.msgBody} numberOfLines={2}>{msg.body}</Text>
+                {msg.url && <Text style={s.msgUrl} numberOfLines={1}>🔗 タップして開く</Text>}
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       {/* My Apps */}
       <View style={s.section}>
@@ -458,6 +497,20 @@ const styles = (isDark: boolean) => StyleSheet.create({
   legalSep: { fontSize: 13, color: isDark ? "#3f3f46" : "#d4d4d8" },
   signOutBtn: { borderRadius: 10, paddingVertical: 14, alignItems: "center", borderWidth: 1, borderColor: isDark ? "#3f3f46" : "#e4e4e7" },
   signOutBtnText: { fontSize: 15, color: isDark ? "#71717a" : "#a1a1aa" },
+  msgCard: {
+    flexDirection: "row", alignItems: "flex-start", gap: 8,
+    borderTopWidth: 1, borderTopColor: isDark ? "#27272a" : "#f4f4f5",
+    paddingVertical: 12,
+  },
+  msgCardUnread: { backgroundColor: isDark ? "#0c1a2e" : "#eff6ff" },
+  unreadDot: {
+    width: 8, height: 8, borderRadius: 4, backgroundColor: "#3b82f6",
+    marginTop: 5, flexShrink: 0,
+  },
+  msgTitle: { fontSize: 13, color: isDark ? "#d4d4d8" : "#3f3f46", marginBottom: 2 },
+  msgTitleUnread: { fontWeight: "700", color: isDark ? "#ffffff" : "#09090b" },
+  msgBody: { fontSize: 12, color: isDark ? "#71717a" : "#a1a1aa", lineHeight: 17 },
+  msgUrl: { fontSize: 11, color: isDark ? "#60a5fa" : "#2563eb", marginTop: 4 },
   shopRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: isDark ? "#27272a" : "#f4f4f5" },
   shopItemTitle: { fontSize: 14, fontWeight: "600", color: isDark ? "#ffffff" : "#09090b" },
   shopItemDesc: { fontSize: 12, color: isDark ? "#71717a" : "#a1a1aa", marginTop: 2 },

@@ -9,6 +9,7 @@ import * as Notifications from "expo-notifications";
 import { Platform, View } from "react-native";
 import { supabase } from "@/lib/supabase";
 import LoginBonus from "@/components/LoginBonus";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -47,6 +48,11 @@ function RootLayoutInner() {
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
 
   useEffect(() => {
+    // Onboarding check
+    AsyncStorage.getItem("user_role").then((role) => {
+      if (!role) router.replace("/onboarding");
+    });
+
     // Push token registration
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return;
@@ -85,6 +91,7 @@ function RootLayoutInner() {
         <Stack.Screen name="users/[username]" options={{ title: "" }} />
         <Stack.Screen name="board/[postId]" options={{ title: "スレッド" }} />
         <Stack.Screen name="auth" options={{ title: "ログイン", headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       </Stack>
       <LoginBonus />
     </View>

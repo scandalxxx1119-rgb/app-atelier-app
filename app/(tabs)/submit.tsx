@@ -52,6 +52,7 @@ export default function SubmitScreen() {
   const [status, setStatus] = useState("released");
   const [testerSlots, setTesterSlots] = useState("");
   const [testerPoints, setTesterPoints] = useState("10");
+  const [testerUrl, setTesterUrl] = useState("");
 
   const [iconUri, setIconUri] = useState<string | null>(null);
   const [screenshots, setScreenshots] = useState<string[]>([]);
@@ -128,6 +129,7 @@ export default function SubmitScreen() {
         status,
         tester_slots: testerSlots ? parseInt(testerSlots) : 0,
         tester_reward_points: testerPoints ? parseInt(testerPoints) : 10,
+        tester_url: testerUrl.trim() || null,
       });
       if (error) throw error;
       Alert.alert("投稿完了", "アプリを投稿しました！", [
@@ -253,6 +255,8 @@ export default function SubmitScreen() {
       <TextInput style={s.input} value={testerSlots} onChangeText={setTesterSlots} placeholder="募集人数（0で募集なし）" placeholderTextColor={isDark ? "#52525b" : "#a1a1aa"} keyboardType="numeric" />
       <View style={{ height: 8 }} />
       <TextInput style={s.input} value={testerPoints} onChangeText={setTesterPoints} placeholder="参加ポイント報酬（デフォルト10pt）" placeholderTextColor={isDark ? "#52525b" : "#a1a1aa"} keyboardType="numeric" />
+      <View style={{ height: 8 }} />
+      <TextInput style={s.input} value={testerUrl} onChangeText={setTesterUrl} placeholder="🔗 TestFlight URL（例: https://testflight.apple.com/join/...）" placeholderTextColor={isDark ? "#52525b" : "#a1a1aa"} autoCapitalize="none" keyboardType="url" />
 
       {/* Submit */}
       <TouchableOpacity style={s.submitBtn} onPress={handleSubmit} disabled={submitting}>

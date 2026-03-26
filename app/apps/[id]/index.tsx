@@ -346,9 +346,9 @@ export default function AppDetailScreen() {
           <Text style={s.sectionTitle}>リンク</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={{ flexDirection: "row", gap: 10 }}>
-              {app.app_store_url && <TouchableOpacity style={s.actionBtnOutline} onPress={() => Linking.openURL(app.app_store_url!)}><Text style={s.actionBtnOutlineText}>🍎 App Store</Text></TouchableOpacity>}
+              {app.app_store_url && <TouchableOpacity style={s.actionBtnOutline} onPress={() => Linking.openURL(app.app_store_url!)}><Text style={s.actionBtnOutlineText}>🍎 iOS版を見る</Text></TouchableOpacity>}
               {Platform.OS !== "ios" && app.play_store_url && <TouchableOpacity style={s.actionBtnOutline} onPress={() => Linking.openURL(app.play_store_url!)}><Text style={s.actionBtnOutlineText}>▶ Google Play</Text></TouchableOpacity>}
-              {app.url && <TouchableOpacity style={s.actionBtnOutline} onPress={() => Linking.openURL(app.url!)}><Text style={s.actionBtnOutlineText}>🌐 Web</Text></TouchableOpacity>}
+              {app.url && <TouchableOpacity style={s.actionBtnOutline} onPress={() => Linking.openURL(app.url!)}><Text style={s.actionBtnOutlineText}>🌐 Webで見る</Text></TouchableOpacity>}
               {app.github_url && <TouchableOpacity style={s.actionBtnOutline} onPress={() => Linking.openURL(app.github_url!)}><Text style={s.actionBtnOutlineText}>🐙 GitHub</Text></TouchableOpacity>}
               {app.twitter_url && <TouchableOpacity style={s.actionBtnOutline} onPress={() => Linking.openURL(app.twitter_url!)}><Text style={s.actionBtnOutlineText}>𝕏 X</Text></TouchableOpacity>}
               <TouchableOpacity style={s.actionBtnOutline} onPress={handleShare}><Text style={s.actionBtnOutlineText}>🔗 シェア</Text></TouchableOpacity>
