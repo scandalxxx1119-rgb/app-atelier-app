@@ -254,7 +254,7 @@ export default function HomeScreen() {
           {/* Tester Recruiting (unique feature) */}
           {testerApps.length > 0 && (
             <View style={s.section}>
-              <SectionHeader title="🧪 テスター募集中" subtitle="開発者が一緒に試してくれる人を探しています" />
+              <SectionHeader title="🧪 先行メンバー募集中" subtitle="リリース前に先行体験できます" />
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 12, paddingBottom: 4 }}>
                 {testerApps.map((item) => (
                   <TouchableOpacity

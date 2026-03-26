@@ -45,6 +45,8 @@ export default function AppDetailScreen() {
   const [applying, setApplying] = useState(false);
   const [totalApplicants, setTotalApplicants] = useState(0);
   const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
+  const [isFollowingDev, setIsFollowingDev] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
@@ -88,6 +90,13 @@ export default function AppDetailScreen() {
         if (data) setBlockedIds(new Set(data.map((b: { blocked_id: string }) => b.blocked_id)));
       });
   }, [user, id]);
+
+  useEffect(() => {
+    if (!user || !app || user.id === app.user_id) return;
+    supabase.from("aa_follows").select("id")
+      .eq("follower_id", user.id).eq("following_id", app.user_id)
+      .maybeSingle().then(({ data }) => setIsFollowingDev(!!data));
+  }, [user, app]);
 
   const handleLike = async () => {
     if (!user) { router.push("/auth"); return; }
@@ -136,6 +145,20 @@ export default function AppDetailScreen() {
     }
     setApplyOpen(false);
     setApplying(false);
+  };
+
+  const handleFollowDev = async () => {
+    if (!user || !app) return;
+    setFollowLoading(true);
+    if (isFollowingDev) {
+      await supabase.from("aa_follows").delete()
+        .eq("follower_id", user.id).eq("following_id", app.user_id);
+      setIsFollowingDev(false);
+    } else {
+      await supabase.from("aa_follows").insert({ follower_id: user.id, following_id: app.user_id });
+      setIsFollowingDev(true);
+    }
+    setFollowLoading(false);
   };
 
   const handleShare = async () => {
@@ -192,20 +215,35 @@ export default function AppDetailScreen() {
 
       {/* Developer */}
       {developer && (
-        <TouchableOpacity style={s.developerRow} onPress={() => router.push(`/users/${developer.username}`)}>
-          {developer.avatar_url ? (
-            <Image source={{ uri: developer.avatar_url }} style={s.devAvatar} />
-          ) : (
-            <View style={s.devAvatarPlaceholder}>
-              <Text style={{ fontSize: 12, fontWeight: "700", color: isDark ? "#71717a" : "#a1a1aa" }}>
-                {developer.username?.[0]?.toUpperCase()}
+        <View style={s.developerRow}>
+          <TouchableOpacity
+            style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}
+            onPress={() => router.push(`/users/${developer.username}`)}
+          >
+            {developer.avatar_url ? (
+              <Image source={{ uri: developer.avatar_url }} style={s.devAvatar} />
+            ) : (
+              <View style={s.devAvatarPlaceholder}>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: isDark ? "#71717a" : "#a1a1aa" }}>
+                  {developer.username?.[0]?.toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <Text style={s.devName}>{developer.username}</Text>
+            {developer.badge && <Badge badge={developer.badge as BadgeType} size="xs" />}
+          </TouchableOpacity>
+          {user && user.id !== app.user_id && (
+            <TouchableOpacity
+              onPress={handleFollowDev}
+              disabled={followLoading}
+              style={[s.followBtn, isFollowingDev && s.followBtnActive]}
+            >
+              <Text style={[s.followBtnText, isFollowingDev && s.followBtnTextActive]}>
+                {isFollowingDev ? "フォロー中" : "フォロー"}
               </Text>
-            </View>
+            </TouchableOpacity>
           )}
-          <Text style={s.devName}>{developer.username}</Text>
-          {developer.badge && <Badge badge={developer.badge as BadgeType} size="xs" />}
-          <Text style={{ color: isDark ? "#71717a" : "#a1a1aa", fontSize: 12, marginLeft: "auto" }}>→</Text>
-        </TouchableOpacity>
+        </View>
       )}
 
       {/* Tags */}
@@ -372,6 +410,10 @@ const styles = (isDark: boolean) => StyleSheet.create({
   editLink: { fontSize: 12, color: isDark ? "#a1a1aa" : "#71717a", textDecorationLine: "underline" },
   likesCount: { fontSize: 13, color: isDark ? "#71717a" : "#a1a1aa" },
   developerRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: isDark ? "#18181b" : "#ffffff", marginHorizontal: 16, marginBottom: 16, borderRadius: 12, borderWidth: 1, borderColor: isDark ? "#27272a" : "#e4e4e7" },
+  followBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: "#2563eb" },
+  followBtnActive: { backgroundColor: "transparent", borderWidth: 1, borderColor: isDark ? "#3f3f46" : "#d4d4d8" },
+  followBtnText: { fontSize: 12, fontWeight: "600", color: "#ffffff" },
+  followBtnTextActive: { color: isDark ? "#a1a1aa" : "#71717a" },
   devAvatar: { width: 28, height: 28, borderRadius: 14 },
   devAvatarPlaceholder: { width: 28, height: 28, borderRadius: 14, backgroundColor: isDark ? "#27272a" : "#e4e4e7", alignItems: "center", justifyContent: "center" },
   devName: { fontSize: 13, fontWeight: "600", color: isDark ? "#ffffff" : "#09090b" },
