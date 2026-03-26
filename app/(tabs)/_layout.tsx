@@ -1,5 +1,5 @@
 import { Tabs, useRouter } from "expo-router";
-import { Text, TouchableOpacity, View } from "react-native";
+import { Text, TouchableOpacity, View, Image } from "react-native";
 import { useTheme } from "@/lib/theme";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -12,19 +12,21 @@ export default function TabsLayout() {
   const inactive = isDark ? "#52525b" : "#a1a1aa";
 
   const [unreadCount, setUnreadCount] = useState(0);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkUnread = async () => {
+    const init = async () => {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) return;
-      const { count } = await supabase
-        .from("aa_messages")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", auth.user.id)
-        .eq("is_read", false);
+      const [{ count }, { data: profile }] = await Promise.all([
+        supabase.from("aa_messages").select("*", { count: "exact", head: true })
+          .eq("user_id", auth.user.id).eq("is_read", false),
+        supabase.from("aa_profiles").select("avatar_url").eq("id", auth.user.id).single(),
+      ]);
       setUnreadCount(count ?? 0);
+      setAvatarUrl(profile?.avatar_url ?? null);
     };
-    checkUnread();
+    init();
   }, []);
 
   return (
@@ -39,7 +41,13 @@ export default function TabsLayout() {
         headerLeft: () => (
           <TouchableOpacity onPress={() => router.push("/(tabs)/profile")} style={{ marginLeft: 16 }}>
             <View>
-              <Text style={{ fontSize: 22 }}>👤</Text>
+              {avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={{ width: 32, height: 32, borderRadius: 16 }} />
+              ) : (
+                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isDark ? "#27272a" : "#e4e4e7", alignItems: "center", justifyContent: "center" }}>
+                  <Text style={{ fontSize: 16 }}>👤</Text>
+                </View>
+              )}
               {unreadCount > 0 && (
                 <View style={{
                   position: "absolute", top: -4, right: -6,
