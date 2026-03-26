@@ -6,6 +6,7 @@ import {
 import { useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/lib/theme";
+import Badge, { BadgeType } from "@/components/Badge";
 
 type App = {
   id: string;
@@ -17,6 +18,7 @@ type App = {
   status: string | null;
   user_id: string;
   username?: string;
+  badge?: string | null;
 };
 
 type Props = {
@@ -46,10 +48,14 @@ export default function FilteredAppList({ tag, emptyMessage }: Props) {
     const userIds = [...new Set(appsData.map((a) => a.user_id))];
     if (userIds.length > 0) {
       const { data: profiles } = await supabase
-        .from("aa_profiles").select("id, username").in("id", userIds);
-      const map: Record<string, string> = {};
-      profiles?.forEach((p: { id: string; username: string }) => { map[p.id] = p.username; });
-      setApps(appsData.map((a) => ({ ...a, username: map[a.user_id] ?? "anonymous" })));
+        .from("aa_profiles").select("id, username, badge").in("id", userIds);
+      const usernameMap: Record<string, string> = {};
+      const badgeMap: Record<string, string | null> = {};
+      profiles?.forEach((p: { id: string; username: string; badge: string | null }) => {
+        usernameMap[p.id] = p.username;
+        badgeMap[p.id] = p.badge;
+      });
+      setApps(appsData.map((a) => ({ ...a, username: usernameMap[a.user_id] ?? "anonymous", badge: badgeMap[a.user_id] ?? null })));
     } else {
       setApps(appsData);
     }
@@ -89,8 +95,11 @@ export default function FilteredAppList({ tag, emptyMessage }: Props) {
         <View style={{ flex: 1, marginLeft: 12 }}>
           <Text style={s.appName} numberOfLines={1}>{item.name}</Text>
           <Text style={s.appTagline} numberOfLines={1}>{item.tagline}</Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
-            <Text style={s.username}>{item.username}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+            <TouchableOpacity onPress={() => router.push(`/users/${item.username}`)}>
+              <Text style={s.username}>by {item.username}</Text>
+            </TouchableOpacity>
+            {item.badge && <Badge badge={item.badge as BadgeType} size="xs" />}
             <View style={[s.statusBadge, { backgroundColor: sc.bg }]}>
               <Text style={[s.statusText, { color: sc.text }]}>{sc.label}</Text>
             </View>

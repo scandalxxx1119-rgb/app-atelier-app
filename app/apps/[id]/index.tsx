@@ -219,18 +219,6 @@ export default function AppDetailScreen() {
         </ScrollView>
       )}
 
-      {/* Action buttons */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16, marginBottom: 20 }}>
-        <View style={{ flexDirection: "row", gap: 10 }}>
-          {app.app_store_url && <TouchableOpacity style={s.actionBtn} onPress={() => Linking.openURL(app.app_store_url!)}><Text style={s.actionBtnText}>🍎 App Store</Text></TouchableOpacity>}
-          {Platform.OS !== "ios" && app.play_store_url && <TouchableOpacity style={s.actionBtn} onPress={() => Linking.openURL(app.play_store_url!)}><Text style={s.actionBtnText}>▶ Google Play</Text></TouchableOpacity>}
-          {app.url && <TouchableOpacity style={s.actionBtnOutline} onPress={() => Linking.openURL(app.url!)}><Text style={s.actionBtnOutlineText}>🌐 Web</Text></TouchableOpacity>}
-          {app.github_url && <TouchableOpacity style={s.actionBtnOutline} onPress={() => Linking.openURL(app.github_url!)}><Text style={s.actionBtnOutlineText}>🐙 GitHub</Text></TouchableOpacity>}
-          {app.twitter_url && <TouchableOpacity style={s.actionBtnOutline} onPress={() => Linking.openURL(app.twitter_url!)}><Text style={s.actionBtnOutlineText}>𝕏 フォロー</Text></TouchableOpacity>}
-          <TouchableOpacity style={s.actionBtnOutline} onPress={handleShare}><Text style={s.actionBtnOutlineText}>🔗 シェア</Text></TouchableOpacity>
-        </View>
-      </ScrollView>
-
       {/* Tester */}
       {isTesterApp && (
         <View style={s.testerBox}>
@@ -280,10 +268,52 @@ export default function AppDetailScreen() {
         </View>
       )}
 
+      {/* Comments */}
+      <View style={{ paddingHorizontal: 16, marginBottom: 24 }}>
+        <Text style={s.sectionTitle}>コメント（{comments.filter((c) => !blockedIds.has(c.user_id)).length}）</Text>
+        {user ? (
+          <View style={[s.commentInputRow, { marginBottom: 16 }]}>
+            <TextInput
+              style={s.commentInput}
+              value={comment}
+              onChangeText={setComment}
+              placeholder="コメントを書く..."
+              placeholderTextColor={isDark ? "#52525b" : "#a1a1aa"}
+              maxLength={500}
+            />
+            <TouchableOpacity
+              style={[s.sendBtn, (!comment.trim() || submitting) && { opacity: 0.4 }]}
+              onPress={handleComment}
+              disabled={!comment.trim() || submitting}
+            >
+              <Text style={s.sendBtnText}>送信</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity onPress={() => router.push("/auth")} style={{ marginBottom: 16 }}>
+            <Text style={s.loginPrompt}>ログインしてコメントする →</Text>
+          </TouchableOpacity>
+        )}
+        {comments.filter((c) => !blockedIds.has(c.user_id)).map((c) => (
+          <View key={c.id} style={s.commentItem}>
+            <View style={s.commentAvatar}>
+              <Text style={{ fontSize: 12, fontWeight: "700", color: isDark ? "#a1a1aa" : "#71717a" }}>
+                {(commentProfiles[c.user_id] ?? "?")[0].toUpperCase()}
+              </Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.commentUser}>{commentProfiles[c.user_id] ?? "anonymous"}</Text>
+              <Text style={s.commentContent}>{(c as { content: string }).content}</Text>
+            </View>
+          </View>
+        ))}
+        {comments.length === 0 && <Text style={s.emptyText}>コメントはまだありません。最初のコメントを書いてみよう！</Text>}
+      </View>
+
       {/* Screenshots */}
       {shots.length > 0 && (
         <View style={{ marginBottom: 24 }}>
-          <Text style={s.sectionTitle}>スクリーンショット</Text>
+          <Text style={[s.sectionTitle, { paddingHorizontal: 16 }]}>スクリーンショット</Text>
           <Image source={{ uri: shots[activeShot] }} style={s.mainShot} resizeMode="contain" />
           {shots.length > 1 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16 }}>
@@ -310,48 +340,22 @@ export default function AppDetailScreen() {
         </View>
       ) : null}
 
-      {/* Comments */}
-      <View style={{ paddingHorizontal: 16 }}>
-        <Text style={s.sectionTitle}>コメント（{comments.filter((c) => !blockedIds.has(c.user_id)).length}）</Text>
-        {comments.filter((c) => !blockedIds.has(c.user_id)).map((c) => (
-          <View key={c.id} style={s.commentItem}>
-            <View style={s.commentAvatar}>
-              <Text style={{ fontSize: 12, fontWeight: "700", color: isDark ? "#a1a1aa" : "#71717a" }}>
-                {(commentProfiles[c.user_id] ?? "?")[0].toUpperCase()}
-              </Text>
+      {/* Links (moved to bottom) */}
+      {(app.app_store_url || (Platform.OS !== "ios" && app.play_store_url) || app.url || app.github_url || app.twitter_url) && (
+        <View style={{ paddingHorizontal: 16, marginBottom: 24 }}>
+          <Text style={s.sectionTitle}>リンク</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              {app.app_store_url && <TouchableOpacity style={s.actionBtnOutline} onPress={() => Linking.openURL(app.app_store_url!)}><Text style={s.actionBtnOutlineText}>🍎 App Store</Text></TouchableOpacity>}
+              {Platform.OS !== "ios" && app.play_store_url && <TouchableOpacity style={s.actionBtnOutline} onPress={() => Linking.openURL(app.play_store_url!)}><Text style={s.actionBtnOutlineText}>▶ Google Play</Text></TouchableOpacity>}
+              {app.url && <TouchableOpacity style={s.actionBtnOutline} onPress={() => Linking.openURL(app.url!)}><Text style={s.actionBtnOutlineText}>🌐 Web</Text></TouchableOpacity>}
+              {app.github_url && <TouchableOpacity style={s.actionBtnOutline} onPress={() => Linking.openURL(app.github_url!)}><Text style={s.actionBtnOutlineText}>🐙 GitHub</Text></TouchableOpacity>}
+              {app.twitter_url && <TouchableOpacity style={s.actionBtnOutline} onPress={() => Linking.openURL(app.twitter_url!)}><Text style={s.actionBtnOutlineText}>𝕏 X</Text></TouchableOpacity>}
+              <TouchableOpacity style={s.actionBtnOutline} onPress={handleShare}><Text style={s.actionBtnOutlineText}>🔗 シェア</Text></TouchableOpacity>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.commentUser}>{commentProfiles[c.user_id] ?? "anonymous"}</Text>
-              <Text style={s.commentContent}>{(c as { content: string }).content}</Text>
-            </View>
-          </View>
-        ))}
-        {comments.length === 0 && <Text style={s.emptyText}>コメントはまだありません</Text>}
-
-        {user ? (
-          <View style={s.commentInputRow}>
-            <TextInput
-              style={s.commentInput}
-              value={comment}
-              onChangeText={setComment}
-              placeholder="コメントを書く..."
-              placeholderTextColor={isDark ? "#52525b" : "#a1a1aa"}
-              maxLength={500}
-            />
-            <TouchableOpacity
-              style={[s.sendBtn, (!comment.trim() || submitting) && { opacity: 0.4 }]}
-              onPress={handleComment}
-              disabled={!comment.trim() || submitting}
-            >
-              <Text style={s.sendBtnText}>送信</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity onPress={() => router.push("/auth")}>
-            <Text style={s.loginPrompt}>ログインしてコメントする →</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+          </ScrollView>
+        </View>
+      )}
     </ScrollView>
   );
 }
