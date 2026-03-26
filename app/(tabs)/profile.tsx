@@ -1,10 +1,10 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useLayoutEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, Image, Alert, ActivityIndicator, Linking,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+import { useRouter, useNavigation } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/lib/theme";
 import Badge, { BadgeType } from "@/components/Badge";
@@ -20,7 +20,18 @@ type App = {
 };
 
 export default function ProfileScreen() {
-  const { isDark } = useTheme();
+  const { isDark, toggle } = useTheme();
+  const navigation = useNavigation();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity onPress={toggle} style={{ marginRight: 16 }}>
+          <Text style={{ fontSize: 20 }}>{isDark ? "☀️" : "🌙"}</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [isDark, toggle]);
   const s = styles(isDark);
   const router = useRouter();
 
