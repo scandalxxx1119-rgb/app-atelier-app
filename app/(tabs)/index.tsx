@@ -119,10 +119,8 @@ export default function HomeScreen() {
     <TouchableOpacity key={item.id} style={s.featuredCard} onPress={() => router.push(`/apps/${item.id}`)}>
       <AppIcon item={item} size={80} />
       <Text style={s.featuredName} numberOfLines={1}>{item.name}</Text>
-      <Text style={s.featuredUser} numberOfLines={1}>{item.username}</Text>
-      <TouchableOpacity style={s.getBtn}>
-        <Text style={s.getBtnText}>見る</Text>
-      </TouchableOpacity>
+      <Text style={s.featuredUser} numberOfLines={1}>by {item.username}</Text>
+      <Text style={s.featuredLike}>♥ {item.likes_count}</Text>
     </TouchableOpacity>
   );
 
@@ -132,12 +130,9 @@ export default function HomeScreen() {
       <View style={{ flex: 1, marginLeft: 12 }}>
         <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
         <Text style={s.rowTagline} numberOfLines={1}>{item.tagline}</Text>
-        <Text style={s.rowUser} numberOfLines={1}>{(item as App & { username?: string }).username}</Text>
+        <Text style={s.rowUser} numberOfLines={1}>by {(item as App & { username?: string }).username}</Text>
       </View>
       <View style={{ alignItems: "center", gap: 4 }}>
-        <TouchableOpacity style={s.getBtn} onPress={() => router.push(`/apps/${item.id}`)}>
-          <Text style={s.getBtnText}>見る</Text>
-        </TouchableOpacity>
         <Text style={s.likeCount}>♥ {item.likes_count}</Text>
       </View>
     </TouchableOpacity>
@@ -169,7 +164,7 @@ export default function HomeScreen() {
           {/* Featured / Boosted */}
           {featured.length > 0 && (
             <View style={s.section}>
-              <SectionHeader title="注目アプリ" subtitle="ブースト中のアプリ" />
+              <SectionHeader title="注目プロジェクト" subtitle="開発者がプッシュ中" />
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 16, paddingBottom: 4 }}>
                 {featured.map(renderFeaturedCard)}
               </ScrollView>
@@ -179,7 +174,7 @@ export default function HomeScreen() {
           {/* New Arrivals */}
           {newApps.length > 0 && (
             <View style={s.section}>
-              <SectionHeader title="新着アプリ" subtitle="最新の投稿" />
+              <SectionHeader title="最新の投稿" subtitle="開発者が公開した作品" />
               <View style={{ paddingHorizontal: 16 }}>
                 {newApps.slice(0, 5).map((item, index) => (
                   <View key={item.id}>
@@ -194,7 +189,7 @@ export default function HomeScreen() {
           {/* Popular Apps */}
           {popularApps.length > 0 && (
             <View style={[s.section, { marginBottom: 32 }]}>
-              <SectionHeader title="人気アプリ" subtitle="いいねが多い順" />
+              <SectionHeader title="みんなが応援中" subtitle="いいねが多い作品" />
               <View style={{ paddingHorizontal: 16 }}>
                 {popularApps.slice(0, 5).map((item, index) => (
                   <View key={item.id}>
@@ -231,15 +226,11 @@ const styles = (isDark: boolean) => StyleSheet.create({
   },
   featuredName: { fontSize: 12, fontWeight: "600", color: isDark ? "#ffffff" : "#09090b", marginTop: 8, textAlign: "center" },
   featuredUser: { fontSize: 11, color: isDark ? "#71717a" : "#a1a1aa", marginTop: 2, textAlign: "center" },
+  featuredLike: { fontSize: 11, color: "#ef4444", marginTop: 6, textAlign: "center" },
   iconPlaceholder: {
     backgroundColor: isDark ? "#27272a" : "#f4f4f5",
     alignItems: "center", justifyContent: "center",
   },
-  getBtn: {
-    marginTop: 8, backgroundColor: isDark ? "#27272a" : "#f2f2f7",
-    paddingHorizontal: 16, paddingVertical: 6, borderRadius: 99,
-  },
-  getBtnText: { fontSize: 13, fontWeight: "600", color: isDark ? "#ffffff" : "#09090b" },
   rowCard: { flexDirection: "row", alignItems: "center", paddingVertical: 12 },
   rowName: { fontSize: 15, fontWeight: "600", color: isDark ? "#ffffff" : "#09090b" },
   rowTagline: { fontSize: 12, color: isDark ? "#71717a" : "#a1a1aa", marginTop: 2 },

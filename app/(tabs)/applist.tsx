@@ -3,12 +3,17 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import FilteredAppList from "@/components/FilteredAppList";
 import { useTheme } from "@/lib/theme";
 
-const PLATFORM_FILTERS = ["iOS", "Mac", "Windows", "クロスプラットフォーム"];
+const PLATFORM_FILTERS = [
+  { label: "iOS", value: "iOS" },
+  { label: "Mac", value: "Mac" },
+  { label: "Windows", value: "Windows" },
+  { label: "マルチ", value: "クロスプラットフォーム" },
+];
 
 export default function AppListScreen() {
   const { isDark } = useTheme();
   const s = styles(isDark);
-  const [platform, setPlatform] = useState("iOS");
+  const [platform, setPlatform] = useState(PLATFORM_FILTERS[0]);
 
   return (
     <View style={{ flex: 1, backgroundColor: isDark ? "#09090b" : "#f2f2f7" }}>
@@ -16,15 +21,15 @@ export default function AppListScreen() {
       <View style={s.tabRow}>
         {PLATFORM_FILTERS.map((p) => (
           <TouchableOpacity
-            key={p}
-            style={[s.tab, platform === p && s.tabActive]}
+            key={p.value}
+            style={[s.tab, platform.value === p.value && s.tabActive]}
             onPress={() => setPlatform(p)}
           >
-            <Text style={[s.tabText, platform === p && s.tabTextActive]}>{p}</Text>
+            <Text style={[s.tabText, platform.value === p.value && s.tabTextActive]}>{p.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
-      <FilteredAppList key={platform} tag={platform} emptyMessage={`${platform}アプリが見つかりません`} />
+      <FilteredAppList key={platform.value} tag={platform.value} emptyMessage={`${platform.label}の作品が見つかりません`} />
     </View>
   );
 }

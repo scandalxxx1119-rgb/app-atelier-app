@@ -1,4 +1,4 @@
-export const PLATFORM_TAGS = ["iOS", "Android", "Web", "Mac", "Windows", "クロスプラットフォーム"];
+export const PLATFORM_TAGS = ["iOS", "Web", "Mac", "Windows", "クロスプラットフォーム"];
 
 export const SPECIAL_TAGS = ["テスター募集", "オープンソース", "無料", "サブスク"];
 

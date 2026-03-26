@@ -212,7 +212,7 @@ export default function AppDetailScreen() {
       {app.tags && app.tags.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16, marginBottom: 16 }}>
           <View style={{ flexDirection: "row", gap: 8 }}>
-            {app.tags.map((tag) => (
+            {app.tags.filter((tag) => Platform.OS !== "ios" || (tag !== "Android" && tag !== "Google Play")).map((tag) => (
               <View key={tag} style={s.tag}><Text style={s.tagText}>{tag}</Text></View>
             ))}
           </View>

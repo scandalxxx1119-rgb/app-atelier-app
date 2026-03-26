@@ -49,9 +49,9 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="applist"
         options={{
-          title: "App",
-          tabBarLabel: "App",
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 22, color }}>📱</Text>,
+          title: "作品一覧",
+          tabBarLabel: "作品",
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 22, color }}>🗂️</Text>,
         }}
       />
       <Tabs.Screen
