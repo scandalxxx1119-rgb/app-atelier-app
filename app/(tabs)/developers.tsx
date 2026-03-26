@@ -14,8 +14,8 @@ type Developer = {
   bio: string | null;
   avatar_url: string | null;
   badge: string | null;
-  created_at: string;
   app_count: number;
+  total_likes: number;
   latest_app_name: string | null;
   latest_app_icon: string | null;
 };
@@ -28,12 +28,12 @@ export default function DevelopersScreen() {
   const [developers, setDevelopers] = useState<Developer[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [sort, setSort] = useState<"created_at" | "app_count">("created_at");
+  const [sort, setSort] = useState<"app_count" | "total_likes">("app_count");
 
   const fetchDevelopers = useCallback(async () => {
     const { data: profiles } = await supabase
       .from("aa_profiles")
-      .select("id, username, bio, avatar_url, badge, created_at")
+      .select("id, username, bio, avatar_url, badge")
       .not("username", "is", null);
 
     if (!profiles || profiles.length === 0) {
@@ -45,41 +45,41 @@ export default function DevelopersScreen() {
 
     const { data: apps } = await supabase
       .from("aa_apps")
-      .select("id, user_id, name, icon_url, created_at")
+      .select("id, user_id, name, icon_url, likes_count, created_at")
       .in("user_id", userIds)
       .order("created_at", { ascending: false });
 
     const appCountMap: Record<string, number> = {};
+    const totalLikesMap: Record<string, number> = {};
     const latestAppMap: Record<string, { name: string; icon_url: string | null }> = {};
 
-    (apps ?? []).forEach((app: { user_id: string; name: string; icon_url: string | null }) => {
+    (apps ?? []).forEach((app: { user_id: string; name: string; icon_url: string | null; likes_count: number }) => {
       if (!latestAppMap[app.user_id]) {
         latestAppMap[app.user_id] = { name: app.name, icon_url: app.icon_url };
       }
       appCountMap[app.user_id] = (appCountMap[app.user_id] ?? 0) + 1;
+      totalLikesMap[app.user_id] = (totalLikesMap[app.user_id] ?? 0) + app.likes_count;
     });
 
     let devList: Developer[] = profiles.map((p: {
       id: string; username: string; bio: string | null;
-      avatar_url: string | null; badge: string | null; created_at: string;
+      avatar_url: string | null; badge: string | null;
     }) => ({
       id: p.id,
       username: p.username,
       bio: p.bio,
       avatar_url: p.avatar_url,
       badge: p.badge,
-      created_at: p.created_at,
       app_count: appCountMap[p.id] ?? 0,
+      total_likes: totalLikesMap[p.id] ?? 0,
       latest_app_name: latestAppMap[p.id]?.name ?? null,
       latest_app_icon: latestAppMap[p.id]?.icon_url ?? null,
     }));
 
-    if (sort === "app_count") {
-      devList = devList.sort((a, b) => b.app_count - a.app_count);
+    if (sort === "total_likes") {
+      devList = devList.sort((a, b) => b.total_likes - a.total_likes);
     } else {
-      devList = devList.sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
+      devList = devList.sort((a, b) => b.app_count - a.app_count);
     }
 
     setDevelopers(devList);
@@ -122,9 +122,14 @@ export default function DevelopersScreen() {
           </View>
         )}
       </View>
-      <View style={{ alignItems: "center", marginLeft: 8 }}>
-        <Text style={s.appCount}>{item.app_count}</Text>
-        <Text style={s.appCountLabel}>作品</Text>
+      <View style={{ alignItems: "center", marginLeft: 8, gap: 4 }}>
+        <View style={{ alignItems: "center" }}>
+          <Text style={s.statNum}>{item.app_count}</Text>
+          <Text style={s.statLabel}>作品</Text>
+        </View>
+        <View style={{ alignItems: "center" }}>
+          <Text style={s.likeNum}>♥ {item.total_likes}</Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -132,11 +137,11 @@ export default function DevelopersScreen() {
   return (
     <View style={s.container}>
       <View style={s.sortRow}>
-        {([["created_at", "新着"], ["app_count", "投稿数"]] as [string, string][]).map(([opt, label]) => (
+        {([["app_count", "投稿数"], ["total_likes", "いいね数"]] as [string, string][]).map(([opt, label]) => (
           <TouchableOpacity
             key={opt}
             style={[s.sortBtn, sort === opt && s.sortBtnActive]}
-            onPress={() => setSort(opt as "created_at" | "app_count")}
+            onPress={() => setSort(opt as "app_count" | "total_likes")}
           >
             <Text style={[s.sortBtnText, sort === opt && s.sortBtnTextActive]}>{label}</Text>
           </TouchableOpacity>
@@ -190,8 +195,9 @@ const styles = (isDark: boolean) => StyleSheet.create({
   latestApp: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 5 },
   latestAppIcon: { width: 18, height: 18, borderRadius: 4 },
   latestAppName: { fontSize: 11, color: isDark ? "#52525b" : "#a1a1aa" },
-  appCount: { fontSize: 18, fontWeight: "700", color: isDark ? "#ffffff" : "#09090b" },
-  appCountLabel: { fontSize: 10, color: isDark ? "#52525b" : "#a1a1aa" },
+  statNum: { fontSize: 17, fontWeight: "700", color: isDark ? "#ffffff" : "#09090b" },
+  statLabel: { fontSize: 10, color: isDark ? "#52525b" : "#a1a1aa" },
+  likeNum: { fontSize: 12, color: "#ef4444", fontWeight: "600" },
   separator: { height: 1, backgroundColor: isDark ? "#27272a" : "#f2f2f7" },
   emptyText: { fontSize: 14, color: isDark ? "#71717a" : "#a1a1aa" },
 });

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 export default function TabsLayout() {
-  const { isDark, toggle } = useTheme();
+  const { isDark } = useTheme();
   const router = useRouter();
   const bg = isDark ? "#09090b" : "#ffffff";
   const active = isDark ? "#ffffff" : "#09090b";
@@ -56,11 +56,6 @@ export default function TabsLayout() {
             </View>
           </TouchableOpacity>
         ),
-        headerRight: () => (
-          <TouchableOpacity onPress={toggle} style={{ marginRight: 16 }}>
-            <Text style={{ fontSize: 20 }}>{isDark ? "☀️" : "🌙"}</Text>
-          </TouchableOpacity>
-        ),
       }}
     >
       <Tabs.Screen
@@ -70,17 +65,12 @@ export default function TabsLayout() {
           tabBarLabel: "ホーム",
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 22, color }}>🏠</Text>,
           headerRight: () => (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 12 }}>
-              <TouchableOpacity
-                onPress={() => router.push("/developer-ranking")}
-                style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: isDark ? "#3f3f46" : "#e4e4e7" }}
-              >
-                <Text style={{ fontSize: 13, fontWeight: "600", color: isDark ? "#ffffff" : "#09090b" }}>🏆 ランキング</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={toggle} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 20 }}>{isDark ? "☀️" : "🌙"}</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              onPress={() => router.push("/developer-ranking")}
+              style={{ marginRight: 14, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: isDark ? "#3f3f46" : "#e4e4e7" }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: "600", color: isDark ? "#ffffff" : "#09090b" }}>🏆 ランキング</Text>
+            </TouchableOpacity>
           ),
         }}
       />

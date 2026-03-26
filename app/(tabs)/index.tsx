@@ -48,64 +48,93 @@ export default function HomeScreen() {
   }, []);
 
   const fetchAll = useCallback(async () => {
-    // Activity feed: recent comments
-    const { data: recentComments } = await supabase
-      .from("aa_comments")
-      .select("id, content, app_id, user_id, created_at")
-      .order("created_at", { ascending: false })
-      .limit(10);
+    // フォロー中ユーザーIDを取得
+    const { data: authData } = await supabase.auth.getUser();
+    const currentUserId = authData.user?.id ?? null;
 
-    // Activity feed: recent app updates
-    const { data: recentUpdates } = await supabase
-      .from("aa_app_updates")
-      .select("id, title, app_id, user_id, created_at")
-      .order("created_at", { ascending: false })
-      .limit(5);
+    let followingIds: string[] = [];
+    if (currentUserId) {
+      const { data: follows } = await supabase
+        .from("aa_follows")
+        .select("following_id")
+        .eq("follower_id", currentUserId);
+      followingIds = (follows ?? []).map((f: { following_id: string }) => f.following_id);
+    }
 
-    // Resolve usernames and app names for activity
-    const commentAppIds = [...new Set((recentComments ?? []).map((c: { app_id: string }) => c.app_id))];
-    const updateAppIds = [...new Set((recentUpdates ?? []).map((u: { app_id: string }) => u.app_id))];
-    const allActivityAppIds = [...new Set([...commentAppIds, ...updateAppIds])];
+    const buildActivityItems = (
+      comments: { id: string; app_id: string; user_id: string; created_at: string }[],
+      updates: { id: string; app_id: string; user_id: string; title: string; created_at: string }[],
+      appNameMap: Record<string, string>,
+      userNameMap: Record<string, string>,
+    ): ActivityItem[] =>
+      [
+        ...comments.map((c) => ({
+          key: `comment-${c.id}`,
+          type: "comment" as const,
+          text: `${userNameMap[c.user_id] ?? "ユーザー"} がコメント`,
+          app_id: c.app_id,
+          app_name: appNameMap[c.app_id] ?? "",
+          created_at: c.created_at,
+        })),
+        ...updates.map((u) => ({
+          key: `update-${u.id}`,
+          type: "update" as const,
+          text: `${userNameMap[u.user_id] ?? "開発者"} がアップデート`,
+          app_id: u.app_id,
+          app_name: appNameMap[u.app_id] ?? "",
+          created_at: u.created_at,
+        })),
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-    const allUserIds = [
-      ...new Set([
-        ...(recentComments ?? []).map((c: { user_id: string }) => c.user_id),
-        ...(recentUpdates ?? []).map((u: { user_id: string }) => u.user_id),
-      ])
-    ];
+    const resolveNames = async (
+      comments: { app_id: string; user_id: string }[],
+      updates: { app_id: string; user_id: string }[],
+    ) => {
+      const appIds = [...new Set([...comments.map((c) => c.app_id), ...updates.map((u) => u.app_id)])];
+      const userIds = [...new Set([...comments.map((c) => c.user_id), ...updates.map((u) => u.user_id)])];
+      const [appRes, userRes] = await Promise.all([
+        appIds.length > 0 ? supabase.from("aa_apps").select("id, name").in("id", appIds) : Promise.resolve({ data: [] }),
+        userIds.length > 0 ? supabase.from("aa_profiles").select("id, username").in("id", userIds) : Promise.resolve({ data: [] }),
+      ]);
+      const appNameMap: Record<string, string> = {};
+      (appRes.data ?? []).forEach((a: { id: string; name: string }) => { appNameMap[a.id] = a.name; });
+      const userNameMap: Record<string, string> = {};
+      (userRes.data ?? []).forEach((p: { id: string; username: string }) => { userNameMap[p.id] = p.username; });
+      return { appNameMap, userNameMap };
+    };
 
-    const [appNameRes, userNameRes] = await Promise.all([
-      allActivityAppIds.length > 0
-        ? supabase.from("aa_apps").select("id, name").in("id", allActivityAppIds)
-        : Promise.resolve({ data: [] }),
-      allUserIds.length > 0
-        ? supabase.from("aa_profiles").select("id, username").in("id", allUserIds)
-        : Promise.resolve({ data: [] }),
-    ]);
+    // Activity feed: フォロー中優先、足りなければ全体で補完
+    let activityItems: ActivityItem[] = [];
 
-    const appNameMap: Record<string, string> = {};
-    (appNameRes.data ?? []).forEach((a: { id: string; name: string }) => { appNameMap[a.id] = a.name; });
-    const userNameMap: Record<string, string> = {};
-    (userNameRes.data ?? []).forEach((p: { id: string; username: string }) => { userNameMap[p.id] = p.username; });
+    if (followingIds.length > 0) {
+      const [followComments, followUpdates] = await Promise.all([
+        supabase.from("aa_comments").select("id, app_id, user_id, created_at")
+          .in("user_id", followingIds).order("created_at", { ascending: false }).limit(10),
+        supabase.from("aa_app_updates").select("id, title, app_id, user_id, created_at")
+          .in("user_id", followingIds).order("created_at", { ascending: false }).limit(5),
+      ]);
+      const fComments = followComments.data ?? [];
+      const fUpdates = followUpdates.data ?? [];
+      const { appNameMap, userNameMap } = await resolveNames(fComments, fUpdates);
+      activityItems = buildActivityItems(fComments, fUpdates, appNameMap, userNameMap).slice(0, 8);
+    }
 
-    const activityItems: ActivityItem[] = [
-      ...(recentComments ?? []).map((c: { id: string; app_id: string; user_id: string; created_at: string }) => ({
-        key: `comment-${c.id}`,
-        type: "comment" as const,
-        text: `${userNameMap[c.user_id] ?? "ユーザー"} がコメント`,
-        app_id: c.app_id,
-        app_name: appNameMap[c.app_id] ?? "",
-        created_at: c.created_at,
-      })),
-      ...(recentUpdates ?? []).map((u: { id: string; app_id: string; user_id: string; title: string; created_at: string }) => ({
-        key: `update-${u.id}`,
-        type: "update" as const,
-        text: `${userNameMap[u.user_id] ?? "開発者"} がアップデート`,
-        app_id: u.app_id,
-        app_name: appNameMap[u.app_id] ?? "",
-        created_at: u.created_at,
-      })),
-    ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 8);
+    // フォロー中の結果が5件未満 or 未フォローなら全体フィードで補完
+    if (activityItems.length < 5) {
+      const [allComments, allUpdates] = await Promise.all([
+        supabase.from("aa_comments").select("id, app_id, user_id, created_at")
+          .order("created_at", { ascending: false }).limit(10),
+        supabase.from("aa_app_updates").select("id, title, app_id, user_id, created_at")
+          .order("created_at", { ascending: false }).limit(5),
+      ]);
+      const aC = allComments.data ?? [];
+      const aU = allUpdates.data ?? [];
+      const { appNameMap, userNameMap } = await resolveNames(aC, aU);
+      const allItems = buildActivityItems(aC, aU, appNameMap, userNameMap);
+      const existingKeys = new Set(activityItems.map((i) => i.key));
+      const supplement = allItems.filter((i) => !existingKeys.has(i.key));
+      activityItems = [...activityItems, ...supplement].slice(0, 8);
+    }
 
     setActivity(activityItems);
 
