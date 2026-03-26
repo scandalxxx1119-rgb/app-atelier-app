@@ -82,7 +82,7 @@ export default function DevelopersScreen() {
       devList = devList.sort((a, b) => b.app_count - a.app_count);
     }
 
-    setDevelopers(devList);
+    setDevelopers(devList.slice(0, 30));
   }, [sort]);
 
   useEffect(() => {
